@@ -23,9 +23,9 @@ export function WaveformPlayer({ project }: { project: Project }) {
       container: container.current,
       url: audioUrl(project.id),
       height: 152,
-      waveColor: '#3f3f46',
-      progressColor: '#39f5ff',
-      cursorColor: '#39f5ff',
+      waveColor: '#22C55E',
+      progressColor: '#A3E635',
+      cursorColor: '#E5F7E7',
       cursorWidth: 1,
       barWidth: 2,
       barGap: 2,
@@ -51,19 +51,19 @@ export function WaveformPlayer({ project }: { project: Project }) {
   ]
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-white/10 bg-panel">
-      <div className="border-b border-white/10 p-6 sm:p-8">
+    <section className="overflow-hidden rounded-3xl border border-foreground/10 bg-surface">
+      <div className="border-b border-foreground/10 p-6 sm:p-8">
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
           <div className="min-w-0">
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-phantom">Original reference</p>
-            <h1 className="truncate text-3xl font-black tracking-tight text-white sm:text-4xl">{project.title}</h1>
-            <p className="mt-2 truncate text-sm text-zinc-500">{project.original_filename}</p>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-primary">Original reference</p>
+            <h1 className="truncate text-3xl font-black tracking-tight text-foreground sm:text-4xl">{project.title}</h1>
+            <p className="mt-2 truncate text-sm text-foreground/50">{project.original_filename}</p>
           </div>
-          <span className="w-fit rounded-full border border-phantom/25 bg-phantom/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-phantom">Immutable source</span>
+          <span className="w-fit rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-primary">Immutable source</span>
         </div>
       </div>
       <div className="p-6 sm:p-8">
-        <div className="rounded-2xl border border-white/5 bg-charcoal p-4 sm:p-6">
+        <div className="rounded-2xl border border-foreground/5 bg-background p-4 sm:p-6">
           <div ref={container} aria-label={`Waveform for ${project.title}`} />
           {loadError && <p className="mt-3 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{loadError}</p>}
           <div className="mt-5 flex items-center gap-4">
@@ -72,21 +72,21 @@ export function WaveformPlayer({ project }: { project: Project }) {
               disabled={!ready}
               aria-label={playing ? 'Pause' : 'Play'}
               onClick={() => wave.current?.playPause()}
-              className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-phantom text-charcoal transition hover:scale-105 disabled:opacity-30"
+              className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-background transition hover:scale-105 hover:bg-secondary disabled:opacity-30"
             >
               {playing ? <PauseIcon /> : <PlayIcon className="ml-0.5" />}
             </button>
             <div className="flex flex-1 items-center justify-between font-mono text-sm tabular-nums">
-              <span className="text-white">{formatTime(currentTime)}</span>
-              <span className="text-zinc-500">{formatTime(project.audio.duration_seconds)}</span>
+              <span className="text-foreground">{formatTime(currentTime)}</span>
+              <span className="text-foreground/50">{formatTime(project.audio.duration_seconds)}</span>
             </div>
           </div>
         </div>
-        <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/5 bg-white/5 sm:grid-cols-5">
+        <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-foreground/5 bg-foreground/5 sm:grid-cols-5">
           {metadata.map(([label, value]) => (
-            <div key={label} className="bg-panel px-4 py-4">
-              <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-600">{label}</dt>
-              <dd className="mt-1.5 text-sm font-semibold text-zinc-200">{value}</dd>
+            <div key={label} className="bg-surface px-4 py-4">
+              <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/35">{label}</dt>
+              <dd className="mt-1.5 text-sm font-semibold text-foreground/80">{value}</dd>
             </div>
           ))}
         </dl>

@@ -56,22 +56,22 @@ export function SeparationWorkspace({ project }: { project: Project }) {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-white/10 bg-panel p-6 sm:p-8">
+      <section className="rounded-3xl border border-foreground/10 bg-surface p-6 sm:p-8">
         <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
           <div className="flex items-start gap-4">
-            <span className="rounded-2xl bg-phantom/10 p-3 text-phantom"><MixerIcon /></span>
+            <span className="rounded-2xl bg-primary/10 p-3 text-primary"><MixerIcon /></span>
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-phantom">Demucs separation</p>
-              <h2 className="mt-1 text-xl font-bold text-zinc-100">Vocals, drums, bass, and other</h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">Runs locally in a single background worker. The original recording is never modified.</p>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-primary">Demucs separation</p>
+              <h2 className="mt-1 text-xl font-bold text-foreground">Vocals, drums, bass, and other</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-foreground/50">Runs locally in a single background worker. The original recording is never modified.</p>
             </div>
           </div>
-          {!completed ? <button type="button" disabled={starting || active || checking} onClick={() => void start()} className="rounded-full bg-phantom px-5 py-3 text-sm font-bold text-charcoal transition hover:bg-cyan-200 disabled:cursor-wait disabled:opacity-50">{active ? 'Processing…' : failed ? 'Try separation again' : 'Separate instruments'}</button> : null}
+          {!completed ? <button type="button" disabled={starting || active || checking} onClick={() => void start()} className="rounded-full bg-primary px-5 py-3 text-sm font-bold text-background transition hover:bg-secondary disabled:cursor-wait disabled:opacity-50">{active ? 'Processing…' : failed ? 'Try separation again' : 'Separate instruments'}</button> : null}
         </div>
         {active ? (
-          <div className="mt-5 rounded-2xl border border-phantom/15 bg-phantom/5 px-5 py-4">
-            <div className="flex items-center gap-3"><span className="h-2.5 w-2.5 animate-pulse rounded-full bg-phantom" /><p className="text-sm font-semibold text-zinc-200">{job.stage}</p></div>
-            {job.progress !== null ? <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-phantom" style={{ width: `${job.progress}%` }} /></div> : <p className="mt-2 text-xs text-zinc-500">This stage does not expose trustworthy percentage progress.</p>}
+          <div className="mt-5 rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4">
+            <div className="flex items-center gap-3"><span className="h-2.5 w-2.5 animate-pulse rounded-full bg-secondary" /><p className="text-sm font-semibold text-foreground/80">{job.stage}</p></div>
+            {job.progress !== null ? <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-foreground/10"><div className="h-full bg-primary" style={{ width: `${job.progress}%` }} /></div> : <p className="mt-2 text-xs text-foreground/50">This stage does not expose trustworthy percentage progress.</p>}
           </div>
         ) : null}
         {failed ? <p role="alert" className="mt-5 rounded-2xl border border-red-400/20 bg-red-400/10 px-5 py-4 text-sm text-red-200"><strong>{job.status === 'interrupted' ? 'Processing was interrupted. ' : 'Separation failed. '}</strong>{job.error_message}</p> : null}
@@ -79,9 +79,9 @@ export function SeparationWorkspace({ project }: { project: Project }) {
       </section>
 
       {completed ? (
-        <div className="flex w-fit rounded-full border border-white/10 bg-panel p-1" aria-label="Playback source">
-          <button type="button" aria-pressed={mode === 'original'} onClick={() => setMode('original')} className={`rounded-full px-5 py-2 text-sm font-bold transition ${mode === 'original' ? 'bg-phantom text-charcoal' : 'text-zinc-500 hover:text-zinc-200'}`}>Original</button>
-          <button type="button" aria-pressed={mode === 'stems'} onClick={() => setMode('stems')} className={`rounded-full px-5 py-2 text-sm font-bold transition ${mode === 'stems' ? 'bg-phantom text-charcoal' : 'text-zinc-500 hover:text-zinc-200'}`}>Stems</button>
+        <div className="flex w-fit rounded-full border border-foreground/10 bg-surface p-1" aria-label="Playback source">
+          <button type="button" aria-pressed={mode === 'original'} onClick={() => setMode('original')} className={`rounded-full px-5 py-2 text-sm font-bold transition ${mode === 'original' ? 'bg-primary text-background' : 'text-foreground/50 hover:text-foreground/80'}`}>Original</button>
+          <button type="button" aria-pressed={mode === 'stems'} onClick={() => setMode('stems')} className={`rounded-full px-5 py-2 text-sm font-bold transition ${mode === 'stems' ? 'bg-primary text-background' : 'text-foreground/50 hover:text-foreground/80'}`}>Stems</button>
         </div>
       ) : null}
 

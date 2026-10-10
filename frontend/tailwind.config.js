@@ -4,9 +4,11 @@ export default {
   theme: {
     extend: {
       colors: {
-        charcoal: '#090d10',
-        panel: '#12181c',
-        phantom: '#39f5ff',
+        background: '#080E0D',
+        surface: '#14201B',
+        primary: '#A3E635',
+        secondary: '#22C55E',
+        foreground: '#E5F7E7',
       },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui'],

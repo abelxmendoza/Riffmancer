@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect width="64" height="64" rx="14" fill="#090d10"/>
-  <g stroke="#39f5ff" stroke-linecap="round" stroke-linejoin="round">
+  <rect width="64" height="64" rx="14" fill="#080E0D"/>
+  <g stroke="#A3E635" stroke-linecap="round" stroke-linejoin="round">
     <path d="M15 27C15 16.5 22.4 9 32 9s17 7.5 17 18c0 7-3.2 11.5-7.5 14v9.5l-6-3-3.5 5-3.5-5-6 3V41C18.2 38.5 15 34 15 27Z" stroke-width="3"/>
     <path d="M25 42.5h14M27 47v-4.5M32 48v-5.5M37 47v-4.5M18 8v13m0-11 7-2v5" stroke-width="2.5"/>
   </g>
-  <g fill="#39f5ff"><path d="M22 27.5c3.2-2.2 7.2-.4 7.2 3.1 0 3-2.4 5-5.2 4.2-3.3-.9-4.6-5.2-2-7.3Zm20 0c-3.2-2.2-7.2-.4-7.2 3.1 0 3 2.4 5 5.2 4.2 3.3-.9 4.6-5.2 2-7.3ZM32 35l-3 6h6l-3-6Z"/><circle cx="15" cy="21" r="3"/><circle cx="22" cy="13" r="3"/></g>
+  <g fill="#22C55E"><path d="M22 27.5c3.2-2.2 7.2-.4 7.2 3.1 0 3-2.4 5-5.2 4.2-3.3-.9-4.6-5.2-2-7.3Zm20 0c-3.2-2.2-7.2-.4-7.2 3.1 0 3 2.4 5 5.2 4.2 3.3-.9 4.6-5.2 2-7.3ZM32 35l-3 6h6l-3-6Z"/><circle cx="15" cy="21" r="3"/><circle cx="22" cy="13" r="3"/></g>
 </svg>

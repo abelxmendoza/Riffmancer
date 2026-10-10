@@ -80,4 +80,4 @@ cd frontend && npm run build
 
 `Other` is Demucs' combined remainder and commonly includes guitars, keyboards, and other instruments. Riffmancer does not promise separate lead/rhythm guitar tracks or perfect isolation.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for boundaries and [docs/ROADMAP.md](docs/ROADMAP.md) for the planned slices.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for boundaries, [docs/ROADMAP.md](docs/ROADMAP.md) for the planned slices, and [docs/BRAND.md](docs/BRAND.md) for the Toxic Signal visual system.
