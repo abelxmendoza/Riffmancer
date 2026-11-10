@@ -3,10 +3,11 @@ import { ProjectLibrary } from './components/ProjectLibrary'
 import { UploadPanel } from './components/UploadPanel'
 import { BrandMark } from './components/BrandMark'
 import { SeparationWorkspace } from './components/SeparationWorkspace'
+import { BeatMaker } from './components/beatmaker/BeatMaker'
 import { listProjects, uploadProject } from './services/api'
 import type { Project } from './types'
 
-export default function App() {
+function StemLab() {
   const [projects, setProjects] = useState<Project[]>([])
   const [selected, setSelected] = useState<Project>()
   const [loading, setLoading] = useState(true)
@@ -37,32 +38,49 @@ export default function App() {
   }
 
   return (
+    <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+      <ProjectLibrary projects={projects} selectedId={selected?.id} onSelect={setSelected} />
+      <main className="min-w-0 space-y-6">
+        <UploadPanel busy={uploading} progress={progress} onFile={upload} />
+        {error && <div role="alert" className="rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm text-red-200"><strong className="mr-2">Import failed.</strong>{error}</div>}
+        {loading && <div className="rounded-3xl border border-foreground/10 bg-surface p-16 text-center text-sm text-foreground/50">Opening local library…</div>}
+        {!loading && selected && <SeparationWorkspace project={selected} />}
+        {!loading && !selected && (
+          <section className="grid min-h-80 place-items-center rounded-3xl border border-dashed border-foreground/10 bg-foreground/[0.015] p-8 text-center">
+            <div><p className="text-2xl font-black text-foreground">Your rehearsal workspace starts here.</p><p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-foreground/50">Import one of your Suno tracks above. Riffmancer will validate it, keep the original safe, and open a seekable waveform.</p></div>
+          </section>
+        )}
+      </main>
+    </div>
+  )
+}
+
+type View = 'beats' | 'stems'
+
+export default function App() {
+  const [view, setView] = useState<View>('beats')
+  const tab = (id: View, label: string) => (
+    <button type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)} className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-wider transition ${view === id ? 'bg-primary text-background' : 'text-foreground/55 hover:text-foreground'}`}>
+      {label}
+    </button>
+  )
+  return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-[1500px] p-4 sm:p-6">
-        <header className="mb-6 flex items-center justify-between px-1">
+        <header className="mb-6 flex flex-wrap items-center justify-between gap-4 px-1">
           <div className="flex items-center gap-3">
             <div className="text-primary"><BrandMark className="h-11 w-11" /></div>
             <div>
               <p className="font-display text-base font-black uppercase tracking-wider text-foreground">Riffmancer</p>
-              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-foreground/35">Audio to arrangement</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-foreground/35">{view === 'beats' ? 'Beats without the theory' : 'Audio to arrangement'}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-foreground/50"><span className="h-2 w-2 rounded-full bg-secondary" /> Local workstation</div>
+          <nav role="tablist" aria-label="Workspace" className="flex rounded-full border border-foreground/10 bg-surface p-1">
+            {tab('beats', 'Beat Maker')}
+            {tab('stems', 'Stem Lab')}
+          </nav>
         </header>
-        <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
-          <ProjectLibrary projects={projects} selectedId={selected?.id} onSelect={setSelected} />
-          <main className="min-w-0 space-y-6">
-            <UploadPanel busy={uploading} progress={progress} onFile={upload} />
-            {error && <div role="alert" className="rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm text-red-200"><strong className="mr-2">Import failed.</strong>{error}</div>}
-            {loading && <div className="rounded-3xl border border-foreground/10 bg-surface p-16 text-center text-sm text-foreground/50">Opening local library…</div>}
-            {!loading && selected && <SeparationWorkspace project={selected} />}
-            {!loading && !selected && (
-              <section className="grid min-h-80 place-items-center rounded-3xl border border-dashed border-foreground/10 bg-foreground/[0.015] p-8 text-center">
-                <div><p className="text-2xl font-black text-foreground">Your rehearsal workspace starts here.</p><p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-foreground/50">Import one of your Suno tracks above. Riffmancer will validate it, keep the original safe, and open a seekable waveform.</p></div>
-              </section>
-            )}
-          </main>
-        </div>
+        {view === 'beats' ? <BeatMaker /> : <StemLab />}
       </div>
     </div>
   )

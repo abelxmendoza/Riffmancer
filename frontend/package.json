@@ -11,9 +11,10 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "tone": "15.1.22",
+    "vite": "latest",
     "wavesurfer.js": "^7.10.1"
   },
   "devDependencies": {

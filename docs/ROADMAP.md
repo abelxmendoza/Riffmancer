@@ -1,5 +1,14 @@
 # Roadmap
 
+## Beat Maker
+
+MIDI keyboard beat making for people without production knowledge.
+
+Status: first version complete. It includes genre presets (post punk, metal, punk, drum & bass, reggaeton, boom bap, house), band mode with chord-following drums and bass, scale lock, drum pads, an editable drum grid with variations, fills and capture, a synthesizer, a mixer, and audio recording.
+
+Next ideas: song sections (intro/verse/chorus) and song arrangement, a loop recorder for synth melodies, MIDI file export, sample-based drum kits, and more genres.
+
+
 ## Slice 1 — Audio workstation foundation
 
 Import and validate songs, persist a project library, display metadata, and provide waveform playback and seeking.
