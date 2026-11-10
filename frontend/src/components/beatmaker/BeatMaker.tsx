@@ -44,6 +44,8 @@ export function BeatMaker() {
   const [activeNotes, setActiveNotes] = useState<Set<number>>(new Set())
   const [activePads, setActivePads] = useState<Set<DrumVoice>>(new Set())
   const held = useRef(new Map<string, Held>())
+  /** Keys currently down, including ones pressed before audio finished starting. */
+  const pressed = useRef(new Set<string>())
 
   useEffect(() => { saveSession(session) }, [session])
 
@@ -122,8 +124,11 @@ export function BeatMaker() {
   }, [])
 
   const start = useCallback(async (source: string, action: PlayAction, velocity: number) => {
+    pressed.current.add(source)
     let engine: AudioEngine
     try { engine = await ensureEngine() } catch { return }
+    // The key may have been let go while audio was still starting; don't leave a note stuck on.
+    if (action.type !== 'drum' && !pressed.current.has(source)) return
     const current = sessionRef.current
     if (action.type === 'drum') {
       engine.hitDrum(action.voice, velocity)
@@ -157,6 +162,7 @@ export function BeatMaker() {
   }, [ensureEngine, flash, setDegree])
 
   const stop = useCallback((source: string) => {
+    pressed.current.delete(source)
     const entry = held.current.get(source)
     if (!entry) return
     held.current.delete(source)

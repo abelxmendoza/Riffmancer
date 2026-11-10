@@ -16,7 +16,8 @@ export class SynthChannel {
   private readonly reverb = new Tone.Reverb({ decay: 2.8, preDelay: 0.01, wet: 0 })
   readonly output = new Tone.Volume(0)
   private patch: SynthPatch
-  private readonly held = new Map<number, number>()
+  /** Held notes with the frequency they were attacked at, so a later octave change can't strand them. */
+  private readonly held = new Map<number, { count: number; frequency: number }>()
 
   constructor(patch: SynthPatch, voices = 8) {
     this.patch = patch
@@ -65,22 +66,31 @@ export class SynthChannel {
 
   /** Starts notes that keep sounding until `release` (for keys held on the keyboard). */
   press(notes: number[], velocity: number) {
-    const fresh = notes.filter((note) => {
-      const count = this.held.get(note) ?? 0
-      this.held.set(note, count + 1)
-      return count === 0
-    })
-    if (fresh.length) this.synth.triggerAttack(this.frequencies(fresh), Tone.immediate(), velocity)
+    const fresh: number[] = []
+    for (const note of notes) {
+      const entry = this.held.get(note)
+      if (entry) entry.count += 1
+      else {
+        const [frequency] = this.frequencies([note])
+        this.held.set(note, { count: 1, frequency })
+        fresh.push(frequency)
+      }
+    }
+    if (fresh.length) this.synth.triggerAttack(fresh, Tone.immediate(), velocity)
   }
 
   release(notes: number[]) {
-    const done = notes.filter((note) => {
-      const count = (this.held.get(note) ?? 0) - 1
-      if (count <= 0) this.held.delete(note)
-      else this.held.set(note, count)
-      return count <= 0
-    })
-    if (done.length) this.synth.triggerRelease(this.frequencies(done), Tone.immediate())
+    const done: number[] = []
+    for (const note of notes) {
+      const entry = this.held.get(note)
+      if (!entry) continue
+      entry.count -= 1
+      if (entry.count <= 0) {
+        this.held.delete(note)
+        done.push(entry.frequency)
+      }
+    }
+    if (done.length) this.synth.triggerRelease(done, Tone.immediate())
   }
 
   releaseAll() {
