@@ -50,7 +50,7 @@ function StemLab() {
         {!loading && selected && <SeparationWorkspace project={selected} />}
         {!loading && !selected && (
           <section className="grid min-h-80 place-items-center rounded-3xl border border-dashed border-foreground/10 bg-foreground/[0.015] p-8 text-center">
-            <div><p className="text-2xl font-black text-foreground">Your rehearsal workspace starts here.</p><p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-foreground/50">Import one of your Suno tracks above. Riffmancer will validate it, keep the original safe, and open a seekable waveform.</p></div>
+            <div><img src="/riffmancer-emblem.webp" width={160} height={160} alt="" className="mx-auto mb-5 w-40 rounded-2xl" /><p className="text-2xl font-black text-foreground">Your rehearsal workspace starts here.</p><p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-foreground/50">Import one of your Suno tracks above. Riffmancer will validate it, keep the original safe, and open a seekable waveform.</p></div>
           </section>
         )}
       </main>

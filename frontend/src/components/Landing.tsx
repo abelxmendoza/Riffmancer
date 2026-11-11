@@ -23,7 +23,7 @@ export function Landing() {
     <div className="space-y-20 pb-16">
       <section className="relative overflow-hidden rounded-[2rem] border border-primary/20 bg-surface px-6 py-12 sm:px-12 sm:py-16">
         <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-primary/10 blur-3xl" />
-        <div className="relative grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="relative grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.3em] text-secondary">MIDI keyboard beat maker</p>
             <h1 className="mt-4 font-display text-4xl font-black uppercase leading-[1.05] text-foreground sm:text-6xl">
@@ -39,13 +39,22 @@ export function Landing() {
             </div>
             <p className="mt-6 text-xs text-foreground/40">Free, runs in your browser. Best in Chrome or Edge for MIDI.</p>
           </div>
-          <div className="mx-auto flex w-full max-w-sm flex-col items-center">
-            <div className="mb-3 self-stretch rounded-2xl rounded-bl-sm border border-primary/30 bg-background/80 px-4 py-3 text-sm leading-6 text-foreground/85 shadow-[0_14px_40px_rgba(0,0,0,0.45)]">
-              I'm <strong className="text-primary">Fret</strong>, your roadie. Tell me "make a metal beat" and I'll start the band, or ask me how anything works.
-              <button type="button" onClick={openAssistant} className="mt-2 block text-xs font-black uppercase tracking-wider text-primary hover:text-secondary">Ask Fret →</button>
-            </div>
-            <FretBot pose="full" mood="rocking" size={250} title="Fret, Riffmancer's skull-bot roadie, headbanging and throwing the horns" className="drop-shadow-[0_24px_40px_rgba(0,0,0,0.55)]" />
+          <img src="/riffmancer-emblem.webp" width={560} height={560} alt="Riffmancer skull emblem made of musical notation" className="order-first mx-auto w-full max-w-[560px] rounded-3xl lg:order-none shadow-[0_0_80px_rgba(163,230,53,0.18)]" />
+        </div>
+      </section>
+
+      <section aria-labelledby="meet-fret" className="grid items-center gap-8 rounded-[2rem] border border-foreground/10 bg-surface px-6 py-10 sm:px-12 md:grid-cols-[minmax(0,1fr)_320px]">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-secondary">Your roadie</p>
+          <h2 id="meet-fret" className="mt-3 font-display text-3xl font-black uppercase text-foreground">Meet Fret</h2>
+          <p className="mt-4 max-w-xl text-base leading-7 text-foreground/70">Fret lives in the chat bar at the bottom of every page. Ask in plain words, like "make a metal beat at 165 bpm", "add a fill" or "make the synth darker", and Fret runs the band for you.</p>
+        </div>
+        <div className="mx-auto flex w-full max-w-sm flex-col items-center">
+          <div className="mb-3 self-stretch rounded-2xl rounded-bl-sm border border-primary/30 bg-background/80 px-4 py-3 text-sm leading-6 text-foreground/85 shadow-[0_14px_40px_rgba(0,0,0,0.45)]">
+            I'm <strong className="text-primary">Fret</strong>, your roadie. Tell me "make a metal beat" and I'll start the band, or ask me how anything works.
+            <button type="button" onClick={openAssistant} className="mt-2 block text-xs font-black uppercase tracking-wider text-primary hover:text-secondary">Ask Fret →</button>
           </div>
+          <FretBot pose="full" mood="rocking" size={250} title="Fret, Riffmancer's skull-bot roadie, headbanging and throwing the horns" className="drop-shadow-[0_24px_40px_rgba(0,0,0,0.55)]" />
         </div>
       </section>
 
@@ -92,12 +101,13 @@ export function Landing() {
       </section>
 
       <section className="rounded-[2rem] border border-primary/25 bg-primary/10 px-6 py-12 text-center">
+        <img src="/riffmancer-emblem.webp" width={220} height={220} alt="" className="mx-auto mb-6 w-44 rounded-2xl sm:w-56" />
         <p className="font-display text-3xl font-black uppercase text-foreground">Plug in. Press play. Riff.</p>
         <a href={hrefFor('beats')} className="mt-6 inline-block rounded-full bg-primary px-6 py-3 text-sm font-black uppercase tracking-wider text-background hover:bg-secondary">Open the Beat Maker</a>
         <p className="mt-6 text-xs text-foreground/45">Got a finished song instead? <a className="font-bold text-secondary underline" href={hrefFor('stems')}>Split it into stems in the Stem Lab.</a></p>
       </section>
 
-      <footer className="border-t border-foreground/10 pt-6 text-xs text-foreground/35">Riffmancer · Sound powered by Tone.js · Made for musicians who just want to play.</footer>
+      <footer className="flex items-center gap-3 border-t border-foreground/10 pt-6 text-xs text-foreground/35"><img src="/riffmancer-emblem.webp" width={40} height={40} alt="" className="h-10 w-10 rounded-lg" /><span>Riffmancer · Sound powered by Tone.js · Made for musicians who just want to play.</span></footer>
     </div>
   )
 }
