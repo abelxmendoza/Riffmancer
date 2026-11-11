@@ -1,8 +1,34 @@
 # Riffmancer
 
-Riffmancer is a local-first workstation for turning AI-generated songs into editable, verifiable arrangements that real musicians can rehearse. Slices 1 and 2 provide a working audio library, source player, Demucs stem separation, and a synchronized four-stem mixer. Transcription is intentionally not included yet.
+Riffmancer is a local-first music workstation with two workspaces:
 
-## Current features
+- **Beat Maker** lets you make beats and instrumentals with a MIDI keyboard, even if you don't know music theory. Pick a genre and press play, and a backing band starts. Then play chords and melodies on top. Every key you press fits the song.
+- **Stem Lab** turns AI-generated songs into stems that real musicians can rehearse with.
+
+## Beat Maker
+
+- Genre presets for **post punk, metal, punk, drum & bass, and reggaeton**, plus boom bap and house. Each preset includes drums, a bass line, a chord rhythm, a chord progression, a key, and its own sounds.
+- **Band mode.** Keys below the split play chords, and the drums and bass follow you. Keys above the split play the synthesizer.
+- **No wrong notes.** Synth notes snap to the song's key, and each chord key always gives a chord that fits.
+- **Drum pads.** Use the on-screen pads, or switch the keyboard to drum mode. MIDI channel 10 always plays drums, and GM drum notes are supported.
+- **Editable 16-step drum grid** with beat A/B, Fill (a drum fill followed by a crash), Mutate (genre-aware variations), and Reset.
+- **Capture.** While the band plays, drum hits you play are written into the beat, and chords you play are written into the progression.
+- **Synthesizer** for the melody, chord, and bass sounds. It has presets, waveform, brightness, resonance, pluck, ADSR, drive, chorus, echo, space, thickness, glide, and octave controls.
+- **Record audio.** Records everything you hear to a downloadable file.
+- No MIDI keyboard? Use the computer keyboard: 1–8 for drums, Z–M for chords, A–' for the synth, and Space to play or stop.
+- Your work is saved in the browser automatically.
+
+MIDI uses the browser's Web MIDI API (Chrome, Edge, Opera, and Firefox after a permission prompt). Sound is built on [Tone.js](https://tonejs.github.io/) (MIT). All drums are synthesized, so no sample packs or sample licenses are needed. The Beat Maker runs entirely in the browser and doesn't need the Python backend. See [docs/BEAT_MAKER.md](docs/BEAT_MAKER.md) for how it works and how to add a genre.
+
+## Fret, the in-app assistant
+
+Fret is Riffmancer's mascot: a skull-bot roadie with a guitar-headstock crest who lives in the chat bar at the bottom of every page. Type what you want in plain words, such as "make a metal beat at 165 bpm", "faster", "add a fill", "key of D minor", "make the synth darker", or "how do I play chords?", and Fret runs the band for you.
+
+Fret's built-in brain runs entirely in the browser and needs no account or key. To let Fret answer open-ended questions too, set `ANTHROPIC_API_KEY` on the server (for example in the Vercel project's environment variables). The `frontend/api/chat.ts` function then answers questions the built-in brain doesn't know, using Claude. Without the key, nothing leaves the browser.
+
+The site opens on a landing page (`#/`), with the Beat Maker at `#/beats` and the Stem Lab at `#/stems`.
+
+## Stem Lab features
 
 - Import WAV, MP3, FLAC, M4A, AAC, or OGG audio (up to 500 MB)
 - Validate the actual media with FFprobe rather than trusting the filename
@@ -54,7 +80,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). Vite proxies `/api` and `/health` to the backend at port 8000.
+Open [http://localhost:5173](http://localhost:5173). The Beat Maker works with just `npm run dev`. The Stem Lab needs the backend, and Vite proxies `/api` and `/health` to the backend at port 8000.
 
 Imported projects are stored under `data/projects` by default. Set `RIFFMANCER_DATA_DIR` to use a different local directory.
 

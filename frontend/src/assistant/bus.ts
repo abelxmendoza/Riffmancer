@@ -1,0 +1,70 @@
+import type { KeyboardMode } from '../beatmaker/input/keymap'
+import type { ScaleName } from '../beatmaker/theory'
+
+/** Things the assistant can do to the Beat Maker. */
+export type BeatAction =
+  | { type: 'genre'; id: string }
+  | { type: 'play' }
+  | { type: 'stop' }
+  | { type: 'tempo'; bpm?: number; delta?: number }
+  | { type: 'fill' }
+  | { type: 'variation'; which: 'main' | 'alt' | 'toggle' }
+  | { type: 'mutate' }
+  | { type: 'reset' }
+  | { type: 'key'; root?: number; scale?: ScaleName }
+  | { type: 'part'; part: 'drums' | 'bass' | 'chords'; on: boolean }
+  | { type: 'keyboardMode'; mode: KeyboardMode }
+  | { type: 'synth'; tweak: SynthTweak }
+  | { type: 'record'; on: boolean }
+
+export type SynthTweak = 'darker' | 'brighter' | 'heavier' | 'cleaner' | 'spacier' | 'drier' | 'wider'
+
+export interface BeatStatus {
+  ready: boolean
+  playing: boolean
+  genreId: string
+  bpm: number
+  root: number
+  scale: ScaleName
+}
+
+type Handler = (action: BeatAction) => void
+
+let handler: Handler | undefined
+const queue: BeatAction[] = []
+
+/** Sends an action to the Beat Maker, or holds it until the Beat Maker is on screen. */
+export function dispatchBeat(action: BeatAction) {
+  if (handler) handler(action)
+  else queue.push(action)
+}
+
+export function registerBeatHandler(next: Handler): () => void {
+  handler = next
+  for (const action of queue.splice(0)) next(action)
+  return () => { if (handler === next) handler = undefined }
+}
+
+let status: BeatStatus = { ready: false, playing: false, genreId: 'post-punk', bpm: 142, root: 4, scale: 'minor' }
+const listeners = new Set<(status: BeatStatus) => void>()
+
+export function publishBeatStatus(next: BeatStatus) {
+  status = next
+  listeners.forEach((listener) => listener(next))
+}
+
+export function getBeatStatus(): BeatStatus {
+  return status
+}
+
+export function subscribeBeatStatus(listener: (status: BeatStatus) => void): () => void {
+  listeners.add(listener)
+  return () => { listeners.delete(listener) }
+}
+
+/** Opens Fret's chat from anywhere (the nav bar, the landing page). */
+export const OPEN_ASSISTANT_EVENT = 'riffmancer:open-assistant'
+
+export function openAssistant() {
+  window.dispatchEvent(new Event(OPEN_ASSISTANT_EVENT))
+}
