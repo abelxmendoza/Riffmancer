@@ -42,6 +42,10 @@ MIDI channel 10 always plays drums, whatever the mode is.
 
 The new genre's sounds automatically appear as synthesizer presets.
 
+## Fret commands
+
+Fret (the chat bar) understands genres, "play"/"stop", tempos ("140 bpm", "faster", "slower"), "add a fill", "beat A/B", "mutate", "reset", keys ("key of E minor"), part toggles ("mute the drums"), keyboard modes, synth tweaks (darker, brighter, heavier, cleaner, spacier, drier, wider), "record", and how-to questions. Commands typed on another page jump to the Beat Maker first. Parsing lives in `src/assistant/engine.ts` and is unit-tested.
+
 ## Limitations
 
 - Web MIDI is not available in Safari. Players there can use the computer keyboard or the on-screen keys.

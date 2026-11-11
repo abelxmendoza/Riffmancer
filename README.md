@@ -20,6 +20,14 @@ Riffmancer is a local-first music workstation with two workspaces:
 
 MIDI uses the browser's Web MIDI API (Chrome, Edge, Opera, and Firefox after a permission prompt). Sound is built on [Tone.js](https://tonejs.github.io/) (MIT). All drums are synthesized, so no sample packs or sample licenses are needed. The Beat Maker runs entirely in the browser and doesn't need the Python backend. See [docs/BEAT_MAKER.md](docs/BEAT_MAKER.md) for how it works and how to add a genre.
 
+## Fret, the in-app assistant
+
+Fret is Riffmancer's mascot: a skull-bot roadie with a guitar-headstock crest who lives in the chat bar at the bottom of every page. Type what you want in plain words, such as "make a metal beat at 165 bpm", "faster", "add a fill", "key of D minor", "make the synth darker", or "how do I play chords?", and Fret runs the band for you.
+
+Fret's built-in brain runs entirely in the browser and needs no account or key. To let Fret answer open-ended questions too, set `ANTHROPIC_API_KEY` on the server (for example in the Vercel project's environment variables). The `frontend/api/chat.ts` function then answers questions the built-in brain doesn't know, using Claude. Without the key, nothing leaves the browser.
+
+The site opens on a landing page (`#/`), with the Beat Maker at `#/beats` and the Stem Lab at `#/stems`.
+
 ## Stem Lab features
 
 - Import WAV, MP3, FLAC, M4A, AAC, or OGG audio (up to 500 MB)

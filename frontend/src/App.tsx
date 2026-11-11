@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { ProjectLibrary } from './components/ProjectLibrary'
 import { UploadPanel } from './components/UploadPanel'
-import { BrandMark } from './components/BrandMark'
+import { ChatBar } from './components/assistant/ChatBar'
+import { Landing } from './components/Landing'
+import { NavBar } from './components/NavBar'
+import { useRoute } from './lib/route'
 import { SeparationWorkspace } from './components/SeparationWorkspace'
 import { BeatMaker } from './components/beatmaker/BeatMaker'
 import { listProjects, uploadProject } from './services/api'
@@ -55,33 +58,17 @@ function StemLab() {
   )
 }
 
-type View = 'beats' | 'stems'
-
 export default function App() {
-  const [view, setView] = useState<View>('beats')
-  const tab = (id: View, label: string) => (
-    <button type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)} className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-wider transition ${view === id ? 'bg-primary text-background' : 'text-foreground/55 hover:text-foreground'}`}>
-      {label}
-    </button>
-  )
+  const route = useRoute()
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-[1500px] p-4 sm:p-6">
-        <header className="mb-6 flex flex-wrap items-center justify-between gap-4 px-1">
-          <div className="flex items-center gap-3">
-            <div className="text-primary"><BrandMark className="h-11 w-11" /></div>
-            <div>
-              <p className="font-display text-base font-black uppercase tracking-wider text-foreground">Riffmancer</p>
-              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-foreground/35">{view === 'beats' ? 'Beats without the theory' : 'Audio to arrangement'}</p>
-            </div>
-          </div>
-          <nav role="tablist" aria-label="Workspace" className="flex rounded-full border border-foreground/10 bg-surface p-1">
-            {tab('beats', 'Beat Maker')}
-            {tab('stems', 'Stem Lab')}
-          </nav>
-        </header>
-        {view === 'beats' ? <BeatMaker /> : <StemLab />}
+      <NavBar route={route} />
+      <div className="mx-auto max-w-[1500px] p-4 pb-32 sm:p-6 sm:pb-32">
+        {route === 'home' && <Landing />}
+        {route === 'beats' && <BeatMaker />}
+        {route === 'stems' && <StemLab />}
       </div>
+      <ChatBar route={route} />
     </div>
   )
 }

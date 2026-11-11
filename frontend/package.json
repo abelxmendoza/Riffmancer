@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && tsc -p tsconfig.api.json && vite build",
     "test": "vitest",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
     "@vitejs/plugin-react": "latest",
     "react": "latest",
     "react-dom": "latest",
@@ -21,6 +22,7 @@
     "@tailwindcss/postcss": "latest",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
+    "@types/node": "^22.20.5",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "autoprefixer": "latest",

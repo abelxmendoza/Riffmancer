@@ -11,6 +11,8 @@ Riffmancer has two workspaces:
 
 - Beat Maker musical logic (`frontend/src/beatmaker/{theory,pattern,conductor,session}.ts`, `input/keymap.ts`) stays free of audio code so it can be unit-tested. Only `beatmaker/engine/` imports Tone.js, and it is loaded lazily on the first user gesture.
 - New genres are data files in `frontend/src/beatmaker/genres/`, registered in `genres/index.ts`. The registry tests validate them.
+- Fret, the assistant (`frontend/src/assistant/`), drives the Beat Maker only through the command bus in `assistant/bus.ts`. New Beat Maker features that Fret should control get a `BeatAction`, a handler in `BeatMaker.tsx`, and parsing plus tests in `assistant/engine.ts`. The offline brain must keep working without any network.
+- The live AI (`frontend/api/chat.ts`) is optional and only runs when `ANTHROPIC_API_KEY` is set on the server. Never call it from the client for things the offline brain can handle, and never put the key in client code.
 - Keep audio engines behind service interfaces. UI and API code must not depend directly on Demucs, Basic Pitch, or future model internals.
 - Never present inferred musical information as certain. Preserve confidence and source-audio timing.
 - Every generated transcription must remain editable.
