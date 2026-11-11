@@ -1,5 +1,7 @@
+import { openAssistant } from '../assistant/bus'
 import { GENRES } from '../beatmaker/genres'
 import { hrefFor } from '../lib/route'
+import { FretBot } from './assistant/FretBot'
 
 const STEPS = [
   { title: 'Pick a genre', body: 'Post punk, metal, punk, drum & bass, reggaeton and more. Each one loads a real drummer, bassist and sound.' },
@@ -25,9 +27,10 @@ export function Landing() {
           <div>
             <p className="text-xs font-black uppercase tracking-[0.3em] text-secondary">MIDI keyboard beat maker</p>
             <h1 className="mt-4 font-display text-4xl font-black uppercase leading-[1.05] text-foreground sm:text-6xl">
-              Make heavy beats.<br /><span className="text-primary">Skip the theory.</span>
+              Raise riffs<br />from the <span className="text-primary">dead.</span>
             </h1>
-            <p className="mt-6 max-w-xl text-base leading-7 text-foreground/65">
+            <p className="mt-5 font-display text-lg font-black uppercase tracking-wide text-foreground/80 sm:text-xl">Make heavy beats. Skip the theory.</p>
+            <p className="mt-4 max-w-xl text-base leading-7 text-foreground/65">
               Riffmancer turns your MIDI keyboard into a full band. Pick a genre, press play, and jam: drums, bass and chords follow every key you hit, and nothing you play is ever out of key.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
@@ -36,7 +39,13 @@ export function Landing() {
             </div>
             <p className="mt-6 text-xs text-foreground/40">Free, runs in your browser. Best in Chrome or Edge for MIDI.</p>
           </div>
-          <img src="/riffmancer-emblem.png" alt="Riffmancer skull emblem made of musical notation" className="mx-auto w-full max-w-[420px] rounded-3xl" />
+          <div className="mx-auto flex w-full max-w-sm flex-col items-center">
+            <div className="mb-3 self-stretch rounded-2xl rounded-bl-sm border border-primary/30 bg-background/80 px-4 py-3 text-sm leading-6 text-foreground/85 shadow-[0_14px_40px_rgba(0,0,0,0.45)]">
+              I'm <strong className="text-primary">Fret</strong>, your roadie. Tell me "make a metal beat" and I'll start the band, or ask me how anything works.
+              <button type="button" onClick={openAssistant} className="mt-2 block text-xs font-black uppercase tracking-wider text-primary hover:text-secondary">Ask Fret →</button>
+            </div>
+            <FretBot pose="full" mood="rocking" size={250} title="Fret, Riffmancer's skull-bot roadie, headbanging and throwing the horns" className="drop-shadow-[0_24px_40px_rgba(0,0,0,0.55)]" />
+          </div>
         </div>
       </section>
 

@@ -93,6 +93,8 @@ const PART_WORDS: [RegExp, 'drums' | 'bass' | 'chords'][] = [[/\bdrums?\b|\bbeat
 
 /** Questions with fixed answers. Checked before commands only when the message is clearly a question. */
 const ANSWERS: [RegExp, string][] = [
+  [/\b(which|what) keys\b|\bcomputer (keys|keyboard)\b|\bkey ?map\b|\bkeyboard shortcuts\b|\bwithout a (midi )?keyboard\b/, 'No MIDI keyboard? Use your computer keys. 1–8 are drums (1 kick, 2 snare, 3 hi-hat, 4 open hat, 5 clap, 6 high tom, 7 floor tom, 8 crash). Z X C V B N M are chords 1–7 of the key, and the band follows them. The home row, A through the apostrophe, plays the synth up the scale.'],
+  [/\b(chord )?progression\b|\bdegrees?\b|\bwhat do the numbers mean\b/, 'The numbers 1–7 are the chords built on each note of the key, and a progression is the order you play them in. Post Punk loves 1-6-3-7, Punk lives on 1-4-5. In Band mode the low keys pick the chord and the bass and drums follow you.'],
   [/\b(midi|plug (it )?in|connect).*\b(keyboard|controller)?|\bkeyboard (not|isn't|won't) work/, 'Plug your MIDI keyboard in with USB (or pair it over Bluetooth), open Riffmancer in Chrome or Edge, and click Allow when the browser asks about MIDI. The dot next to "Play your keyboard" turns green when I can hear it. Safari can\'t do MIDI, but your computer keys work everywhere: 1–8 drums, Z–M chords, A to \' synth, Space to play.'],
   [/\b(play|do|make|use) chords?\b|\bhow.*chords?\b/, 'Easy mode: in Band mode, every white key left of the split (C4 by default) is a whole chord that fits the song. Hit one and the bass and drums follow it. You can\'t pick a wrong one. On a computer keyboard, Z X C V B N M are chords 1 to 7.'],
   [/\bwrong notes?\b|\bscale lock\b|\bout of key\b/, '"No wrong notes" snaps every synth key to the nearest note in the song\'s key, so even random mashing sounds musical. Turn it off in the keyboard panel if you want every note exactly as pressed.'],
@@ -112,9 +114,19 @@ const ANSWERS: [RegExp, string][] = [
 
 const isQuestion = (text: string) => /\?$|^(how|what|why|where|when|can|does|do|is|which|who)\b/.test(text)
 
-function genreDescription(id: string) {
+/** A genre's facts, read straight from the preset the Beat Maker plays. */
+export function genreDescription(id: string) {
   const genre = getGenre(id)
-  return `${genre.name}: ${genre.tagline} ${genre.tips[0] ?? ''}`.trim()
+  const key = `${NOTE_NAMES[genre.key.root]} ${SCALE_LABELS[genre.key.scale].toLowerCase()}`
+  const swing = genre.swing > 0.2 ? ', with a swung groove' : ''
+  const tip = genre.tips[0] ? ` Tip: ${genre.tips[0]}` : ''
+  return `${genre.name}: ${genre.tagline} It runs ${genre.bpm.min}–${genre.bpm.max} BPM (the preset starts at ${genre.bpm.default})${swing}, in ${key}, with chords on degrees ${genre.progression.join('-')}.${tip}`
+}
+
+/** Tips for the genre that's loaded right now. */
+function genreTips(id: string) {
+  const genre = getGenre(id)
+  return `For ${genre.name}: ${genre.tips.join(' ')}`
 }
 
 /**
@@ -133,6 +145,9 @@ export function respond(input: string, context: EngineContext): Reply {
 
   const genreAsked = findGenre(text)
   if (genreAsked && /\b(what is|what's|tell me about|describe|explain)\b/.test(text)) return reply(genreDescription(genreAsked))
+
+  if (/\b(tips?|advice)\b/.test(text) && !genreAsked) return reply(genreTips(context.beat.genreId))
+  if (genreAsked && /\b(tips?|advice)\b/.test(text)) return reply(genreTips(genreAsked))
 
   if (isQuestion(text)) {
     for (const [pattern, answer] of ANSWERS) if (pattern.test(text)) return reply(answer)
@@ -234,9 +249,11 @@ export function chipsFor(route: Route, beat: BeatStatus): string[] {
       'Switch to beat B',
       'Make the synth heavier',
       'How do I play chords?',
+      'Which keys play what?',
+      'Give me a tip for this genre',
       beat.playing ? 'Stop' : 'Surprise me',
     ]
   }
   if (route === 'stems') return ['What is the Stem Lab?', 'Take me to the Beat Maker', 'Make a punk beat']
-  return ['Make a post punk beat', 'What genres can you play?', 'How do I connect my MIDI keyboard?', 'What can you do?']
+  return ['Make a post punk beat', 'Tell me about metal', 'What genres can you play?', 'How do I connect my MIDI keyboard?', 'What can you do?']
 }

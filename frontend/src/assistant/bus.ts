@@ -61,3 +61,10 @@ export function subscribeBeatStatus(listener: (status: BeatStatus) => void): () 
   listeners.add(listener)
   return () => { listeners.delete(listener) }
 }
+
+/** Opens Fret's chat from anywhere (the nav bar, the landing page). */
+export const OPEN_ASSISTANT_EVENT = 'riffmancer:open-assistant'
+
+export function openAssistant() {
+  window.dispatchEvent(new Event(OPEN_ASSISTANT_EVENT))
+}

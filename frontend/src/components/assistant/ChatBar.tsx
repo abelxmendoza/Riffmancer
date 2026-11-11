@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { dispatchBeat, getBeatStatus, subscribeBeatStatus, type BeatStatus } from '../../assistant/bus'
+import { dispatchBeat, getBeatStatus, OPEN_ASSISTANT_EVENT, subscribeBeatStatus, type BeatStatus } from '../../assistant/bus'
 import { chipsFor, respond, type Mood } from '../../assistant/engine'
 import { askLive, probeLive, type LiveState } from '../../assistant/live'
 import { ASSISTANT_NAME, GREETING } from '../../assistant/persona'
@@ -48,6 +48,11 @@ export function ChatBar({ route }: { route: Route }) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => subscribeBeatStatus(setBeat), [])
+  useEffect(() => {
+    const onOpen = () => { setOpen(true); requestAnimationFrame(() => inputRef.current?.focus()) }
+    window.addEventListener(OPEN_ASSISTANT_EVENT, onOpen)
+    return () => window.removeEventListener(OPEN_ASSISTANT_EVENT, onOpen)
+  }, [])
   useEffect(() => { void probeLive().then((ok) => setLive(ok ? 'live' : 'offline')) }, [])
   useEffect(() => {
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.filter((message) => !message.pending).slice(-40))) } catch { /* storage blocked */ }

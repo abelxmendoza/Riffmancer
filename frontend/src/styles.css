@@ -32,6 +32,11 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .fretbot.fb-rocking .fb-note-2 { animation-delay: .5s; }
 .fretbot.fb-confused .fb-head { animation: fb-shake .5s ease-in-out 1, fb-droop 2s ease-in-out .5s infinite; }
 .fretbot.fb-confused .fb-drip { animation: fb-drip 1.6s ease-in infinite; }
+.fretbot .fb-speaker { animation: fb-thump .9s ease-in-out infinite; }
+.fretbot .fb-horns { transform-origin: 20% 75%; animation: fb-horns 3.2s ease-in-out infinite; }
+.fretbot .fb-mic { transform-origin: 70% 90%; animation: fb-mic 3.6s ease-in-out infinite; }
+.fretbot.fb-rocking .fb-horns { animation: fb-horns-hard .42s ease-in-out infinite; }
+.fretbot.fb-rocking .fb-speaker { animation-duration: .42s; }
 .fretbot.fb-still *, .fretbot.fb-still { animation: none !important; }
 @media (prefers-reduced-motion: reduce) { .fretbot, .fretbot * { animation: none !important; } }
 
@@ -48,3 +53,7 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 @keyframes fb-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 @keyframes fb-droop { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-5deg); } }
 @keyframes fb-drip { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(12px); opacity: 0; } }
+@keyframes fb-thump { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.12); } }
+@keyframes fb-horns { 0%, 78%, 100% { transform: rotate(0); } 84% { transform: rotate(-9deg); } 90% { transform: rotate(5deg); } }
+@keyframes fb-horns-hard { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-10deg); } }
+@keyframes fb-mic { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(4deg); } }

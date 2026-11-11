@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { GENRES } from '../beatmaker/genres'
+import { NOTE_NAMES } from '../beatmaker/theory'
 import type { BeatStatus } from './bus'
-import { chipsFor, findGenre, findKey, respond } from './engine'
+import { chipsFor, findGenre, findKey, genreDescription, respond } from './engine'
 
 const beat: BeatStatus = { ready: true, playing: false, genreId: 'post-punk', bpm: 142, root: 4, scale: 'minor' }
 const ctx = { route: 'beats' as const, beat }
@@ -61,5 +63,48 @@ describe('assistant brain', () => {
   it('offers chips that fit the page', () => {
     expect(chipsFor('beats', { ...beat, playing: true })).toContain('Add a fill')
     expect(chipsFor('home', beat).length).toBeGreaterThan(2)
+  })
+
+  it('describes every genre from its real preset', () => {
+    for (const genre of GENRES) {
+      const text = genreDescription(genre.id)
+      expect(text).toContain(genre.tagline)
+      expect(text).toContain(`${genre.bpm.min}–${genre.bpm.max} BPM`)
+      expect(text).toContain(`starts at ${genre.bpm.default}`)
+      expect(text).toContain(NOTE_NAMES[genre.key.root])
+      expect(text).toContain(genre.progression.join('-'))
+    }
+  })
+
+  it('answers genre questions without touching the band', () => {
+    const metal = GENRES.find((genre) => genre.id === 'metal')!
+    const result = respond('Tell me about metal', { ...ctx, route: 'home' })
+    expect(result.actions).toEqual([])
+    expect(result.navigate).toBeUndefined()
+    expect(result.text).toContain(`${metal.bpm.min}–${metal.bpm.max} BPM`)
+    expect(respond('what is post punk?', ctx).text).toMatch(/^Post Punk:/)
+  })
+
+  it('gives tips for the loaded genre, or a named one', () => {
+    const house = GENRES.find((genre) => genre.id === 'house')!
+    const metal = GENRES.find((genre) => genre.id === 'metal')!
+    expect(respond('Give me a tip for this genre', { ...ctx, beat: { ...beat, genreId: 'house' } }).text).toContain(house.tips[0])
+    expect(respond('any metal tips?', ctx).text).toContain(metal.tips[0])
+  })
+
+  it('explains the computer keys instead of starting the band', () => {
+    const result = respond('Which keys play what?', ctx)
+    expect(result.actions).toEqual([])
+    expect(result.text).toMatch(/Z X C V B N M/)
+  })
+
+  it('explains chord progressions', () => {
+    expect(respond('what does chord progression mean?', ctx).text).toMatch(/1-6-3-7/)
+  })
+
+  it('answers every starter chip that is a question', () => {
+    for (const route of ['home', 'beats', 'stems'] as const) {
+      for (const chip of chipsFor(route, beat)) expect(respond(chip, { route, beat }).unknown, chip).toBe(false)
+    }
   })
 })
