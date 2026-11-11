@@ -58,6 +58,8 @@ export function Studio() {
   const [showSettings, setShowSettings] = useState(false)
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const [deviceId, setDeviceId] = useState<string>()
+  const deviceIdRef = useRef<string | undefined>(undefined)
+  deviceIdRef.current = deviceId
   const [addRole, setAddRole] = useState<VocalRole>('double')
   const fileInput = useRef<HTMLInputElement>(null)
   const playheadLine = useRef<HTMLDivElement>(null)
@@ -186,7 +188,7 @@ export function Studio() {
     if (!track) { setError('Arm a vocal track first: press its red ● button.'); return }
     try {
       const engine = await ensureEngine()
-      await engine.record(current, playheadRef.current)
+      await engine.record(current, playheadRef.current, deviceIdRef.current)
       setRecording(true)
       setPlaying(true)
       setSelectedTrackId(track.id)
@@ -282,6 +284,8 @@ export function Studio() {
   const exportAudio = useCallback(async (what: 'mix' | 'stems') => {
     setError(undefined)
     try {
+      // Finish a take in progress first, so it's saved and included in the export.
+      if (engineRef.current?.isRecording) await stopRecordingRef.current()
       await ensureEngine()
       const engine = engineRef.current!
       engine.stop()
@@ -302,7 +306,21 @@ export function Studio() {
 
   // ---- Track editing ----
   const selectedTrack = project.tracks.find((track) => track.id === selectedTrackId) ?? project.tracks[0]
-  const onTrack = useCallback((id: string, changes: Partial<Track>) => update((current) => updateTrack(current, id, changes)), [update])
+  const onTrack = useCallback((id: string, changes: Partial<Track>) => {
+    update((current) => updateTrack(current, id, changes))
+    // Monitoring needs live audio and the mic, so start both when it's switched on.
+    if (changes.monitor) {
+      void (async () => {
+        try {
+          const engine = await ensureEngine()
+          await engine.openMic(deviceIdRef.current)
+          engine.sync(projectRef.current)
+        } catch (reason) {
+          setError(micError(reason))
+        }
+      })()
+    }
+  }, [ensureEngine, update])
   const onRemoveTrack = useCallback((id: string) => {
     const track = projectRef.current.tracks.find((candidate) => candidate.id === id)
     if (track?.clips.length && !window.confirm(`Delete "${track.name}" and its recordings?`)) return

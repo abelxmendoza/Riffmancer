@@ -255,10 +255,10 @@ export class StudioEngine {
    * Starts recording onto the armed track at `from` seconds, after a count-in. Loop recording keeps
    * cycling the loop region and returns one take per pass.
    */
-  async record(project: StudioProject, from: number) {
+  async record(project: StudioProject, from: number, deviceId?: string) {
     const track = armedTrack(project)
     if (!track) throw new Error('Arm a vocal track first (the ● button on a track).')
-    await this.openMic()
+    await this.openMic(deviceId)
     this.sync(project)
     const transport = Tone.getTransport()
     if (transport.state === 'started') transport.stop()
