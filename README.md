@@ -3,6 +3,7 @@
 Riffmancer is a local-first music workstation with two workspaces:
 
 - **Beat Maker** lets you make beats and instrumentals with a MIDI keyboard, even if you don't know music theory. Pick a genre and press play, and a backing band starts. Then play chords and melodies on top. Every key you press fits the song.
+- **Studio** records your vocals over an instrumental (an AI-generated song, Stem Lab stems, or a Beat Maker take), with genre vocal presets, stacked takes, a master bus and WAV export.
 - **Stem Lab** turns AI-generated songs into stems that real musicians can rehearse with.
 
 ## Beat Maker
@@ -26,7 +27,11 @@ Fret is Riffmancer's mascot: a skull-bot roadie with a guitar-headstock crest wh
 
 Fret's built-in brain runs entirely in the browser and needs no account or key. To let Fret answer open-ended questions too, set `ANTHROPIC_API_KEY` on the server (for example in the Vercel project's environment variables). The `frontend/api/chat.ts` function then answers questions the built-in brain doesn't know, using Claude. Without the key, nothing leaves the browser.
 
-The site opens on a landing page (`#/`), with the Beat Maker at `#/beats` and the Stem Lab at `#/stems`.
+The site opens on a landing page (`#/`), with the Beat Maker at `#/beats`, the Studio at `#/studio` and the Stem Lab at `#/stems`.
+
+## Studio
+
+Import an instrumental, arm a vocal track, put on headphones and hit Record (or press R). You get a count-in and a click, then sing. Record again at the same spot and the new take stacks in the same clip; turn on Loop to record take after take. Each vocal track has an editable chain (gate, low/high cut, EQ, compressor, de-esser, drive, octave-down layer, doubler, chorus, tempo-synced delay, reverb) with presets for post punk, metal (clean, scream, guttural), punk, drum & bass, reggaeton, boom bap and house. Export a WAV mix through the master bus, or a zip of stems. Everything runs in the browser and saves locally in IndexedDB; nothing is uploaded. Fret can drive it ("record", "use the scream preset", "add a double track", "export the stems"). See [docs/STUDIO.md](docs/STUDIO.md).
 
 ## Stem Lab features
 

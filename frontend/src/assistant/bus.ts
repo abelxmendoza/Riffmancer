@@ -68,3 +68,62 @@ export const OPEN_ASSISTANT_EVENT = 'riffmancer:open-assistant'
 export function openAssistant() {
   window.dispatchEvent(new Event(OPEN_ASSISTANT_EVENT))
 }
+
+/** Things the assistant can do in the Studio (vocal recording workspace). */
+export type StudioAction =
+  | { type: 'play' }
+  | { type: 'stop' }
+  | { type: 'record'; on: boolean }
+  | { type: 'genre'; id: string }
+  | { type: 'preset'; id: string }
+  | { type: 'addTrack'; role: 'lead' | 'double' | 'ad-lib' | 'scream' | 'gang' | 'harmony' | 'fx' }
+  | { type: 'export'; what: 'mix' | 'stems' }
+  | { type: 'metronome'; on: boolean }
+  | { type: 'countIn'; bars: number }
+  | { type: 'loop'; on: boolean }
+  | { type: 'tempo'; bpm?: number; delta?: number }
+  | { type: 'import' }
+
+export interface StudioStatus {
+  ready: boolean
+  playing: boolean
+  recording: boolean
+  genre: string
+  bpm: number
+  tracks: number
+  armedTrack?: string
+}
+
+type StudioHandler = (action: StudioAction) => void
+
+let studioHandler: StudioHandler | undefined
+const studioQueue: StudioAction[] = []
+
+/** Sends an action to the Studio, or holds it until the Studio is on screen. */
+export function dispatchStudio(action: StudioAction) {
+  if (studioHandler) studioHandler(action)
+  else studioQueue.push(action)
+}
+
+export function registerStudioHandler(next: StudioHandler): () => void {
+  studioHandler = next
+  for (const action of studioQueue.splice(0)) next(action)
+  return () => { if (studioHandler === next) studioHandler = undefined }
+}
+
+let studioStatus: StudioStatus = { ready: false, playing: false, recording: false, genre: 'post-punk', bpm: 142, tracks: 1 }
+const studioListeners = new Set<(status: StudioStatus) => void>()
+
+export function publishStudioStatus(next: StudioStatus) {
+  studioStatus = next
+  studioListeners.forEach((listener) => listener(next))
+}
+
+export function getStudioStatus(): StudioStatus {
+  return studioStatus
+}
+
+export function subscribeStudioStatus(listener: (status: StudioStatus) => void): () => void {
+  studioListeners.add(listener)
+  return () => { studioListeners.delete(listener) }
+}

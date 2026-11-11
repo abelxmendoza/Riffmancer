@@ -2,9 +2,10 @@
 
 ## Product boundary
 
-Riffmancer has two workspaces:
+Riffmancer has three workspaces:
 
 - The **Beat Maker** helps people without production knowledge make beats and instrumentals with a MIDI keyboard. Keep it guided and genre-driven: it should not grow into a full DAW timeline. The main genres are post punk, metal, punk, drum & bass, and reggaeton.
+- The **Studio** is where the multitrack timeline lives: record vocals over an imported instrumental, apply genre vocal chains, mix and export. It runs in the browser (Tone.js, Web Audio) with no backend.
 - The **Stem Lab** turns generated songs into editable, verifiable rehearsal material for human musicians.
 
 ## Engineering rules
@@ -13,6 +14,8 @@ Riffmancer has two workspaces:
 - New genres are data files in `frontend/src/beatmaker/genres/`, registered in `genres/index.ts`. The registry tests validate them.
 - Fret, the assistant (`frontend/src/assistant/`), drives the Beat Maker only through the command bus in `assistant/bus.ts`. New Beat Maker features that Fret should control get a `BeatAction`, a handler in `BeatMaker.tsx`, and parsing plus tests in `assistant/engine.ts`. The offline brain must keep working without any network.
 - The live AI (`frontend/api/chat.ts`) is optional and only runs when `ANTHROPIC_API_KEY` is set on the server. Never call it from the client for things the offline brain can handle, and never put the key in client code.
+- Studio logic (`frontend/src/studio/{project,presets,timing}.ts`) stays free of audio code. Only `studio/engine/` imports Tone.js, loaded lazily. Live playback and the offline mixdown share the same chain builders in `studio/engine/chain.ts`, so exports sound like playback. Recordings are stored dry; effects are applied on playback and export.
+- New vocal presets are data in `studio/presets.ts`; the preset tests check their ranges. Fret drives the Studio only through `StudioAction`s in `assistant/bus.ts`, parsed in `assistant/studioBrain.ts`.
 - Keep audio engines behind service interfaces. UI and API code must not depend directly on Demucs, Basic Pitch, or future model internals.
 - Never present inferred musical information as certain. Preserve confidence and source-audio timing.
 - Every generated transcription must remain editable.

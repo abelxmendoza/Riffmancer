@@ -9,6 +9,7 @@ import { ACCENT, chordNotesFor, cloneGrid, cycleVelocity, mutateGrid, NORMAL } f
 import { loadSession, saveSession, sessionForGenre, type Session } from '../../beatmaker/session'
 import { chordLabel, NOTE_NAMES, noteName, SCALE_LABELS, SCALES, type ScaleName } from '../../beatmaker/theory'
 import { publishBeatStatus, registerBeatHandler, type BeatAction, type SynthTweak } from '../../assistant/bus'
+import { sendToStudio } from '../../studio/storage'
 import { PauseIcon, PlayIcon } from '../Icons'
 import { DrumGrid } from './DrumGrid'
 import { DrumPads } from './DrumPads'
@@ -39,7 +40,7 @@ export function BeatMaker() {
   const captureRef = useRef(capture)
   captureRef.current = capture
   const [recordingAudio, setRecordingAudio] = useState(false)
-  const [take, setTake] = useState<{ url: string; name: string }>()
+  const [take, setTake] = useState<{ url: string; name: string; blob: Blob }>()
   const [synthPart, setSynthPart] = useState<SynthPart>('lead')
   const [midiStatus, setMidiStatus] = useState<MidiStatus>({ state: 'pending' })
   const [activeNotes, setActiveNotes] = useState<Set<number>>(new Set())
@@ -224,6 +225,16 @@ export function BeatMaker() {
   }
   useEffect(() => { if (tick?.fill || tick === undefined) setFillQueued(false) }, [tick?.fill, tick])
 
+  const sendTakeToStudio = async () => {
+    if (!take) return
+    try {
+      await sendToStudio(take.name, take.blob)
+      window.location.hash = '#/studio'
+    } catch (reason) {
+      setAudioError(reason instanceof Error ? reason.message : 'Could not send the take to the Studio.')
+    }
+  }
+
   const toggleRecording = async () => {
     try {
       const engine = await ensureEngine()
@@ -232,7 +243,7 @@ export function BeatMaker() {
         setRecordingAudio(false)
         if (take) URL.revokeObjectURL(take.url)
         const extension = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'm4a' : 'webm'
-        setTake({ url: URL.createObjectURL(blob), name: `riffmancer-${sessionRef.current.genreId}-${sessionRef.current.bpm}bpm.${extension}` })
+        setTake({ blob, url: URL.createObjectURL(blob), name: `riffmancer-${sessionRef.current.genreId}-${sessionRef.current.bpm}bpm.${extension}` })
       } else {
         await engine.startRecording()
         setRecordingAudio(true)
@@ -324,6 +335,7 @@ export function BeatMaker() {
           <Toggle on={capture} label={capture ? '● Capturing' : 'Capture'} onClick={() => setCapture((value) => !value)} title="While playing, drum hits are written into the beat and chords into the progression" />
           <Toggle on={recordingAudio} label={recordingAudio ? '■ Stop recording' : '● Record audio'} onClick={() => void toggleRecording()} title="Record everything you hear to an audio file" />
           {take && <a href={take.url} download={take.name} className="rounded-full border border-secondary px-3 py-1.5 text-xs font-bold text-secondary hover:bg-secondary hover:text-background">Download take</a>}
+          {take && <button type="button" onClick={() => void sendTakeToStudio()} className="rounded-full border border-primary px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary hover:text-background" title="Open this take in the Studio and record vocals over it">Send to Studio 🎤</button>}
         </div>
         {audioError && <p role="alert" className="mt-3 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">{audioError}</p>}
       </section>

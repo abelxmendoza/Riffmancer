@@ -1,7 +1,8 @@
 import { GENRES, getGenre } from '../beatmaker/genres'
 import { NOTE_NAMES, SCALE_LABELS, type ScaleName } from '../beatmaker/theory'
 import type { Route } from '../lib/route'
-import type { BeatAction, BeatStatus, SynthTweak } from './bus'
+import type { BeatAction, BeatStatus, StudioAction, StudioStatus, SynthTweak } from './bus'
+import { respondStudio } from './studioBrain'
 import { ASSISTANT_NAME } from './persona'
 
 export type Mood = 'idle' | 'listening' | 'thinking' | 'ready' | 'rocking' | 'confused'
@@ -10,6 +11,8 @@ export interface Reply {
   text: string
   /** Changes for the Beat Maker. */
   actions: BeatAction[]
+  /** Changes for the Studio. */
+  studioActions?: StudioAction[]
   /** A page to open. */
   navigate?: Route
   /** True when the built-in brain didn't understand; the live model may take over. */
@@ -20,6 +23,7 @@ export interface Reply {
 export interface EngineContext {
   route: Route
   beat: BeatStatus
+  studio?: StudioStatus
 }
 
 const GENRE_ALIASES: [RegExp, string][] = [
@@ -57,7 +61,7 @@ export function findKey(text: string): { root?: number; scale?: ScaleName } | un
   return { root, scale }
 }
 
-function findTempo(text: string): { bpm?: number; delta?: number } | undefined {
+export function findTempo(text: string): { bpm?: number; delta?: number } | undefined {
   const exact = text.match(/\b(\d{2,3})\s*(?:bpm|beats per minute)\b/) ?? (/\b(tempo|speed|bpm)\b/.test(text) ? text.match(/\b(\d{2,3})\b/) : null)
   if (exact) return { bpm: Number(exact[1]) }
   if (/\b(a lot|way|much) faster\b|\bdouble time\b/.test(text)) return { delta: 25 }
@@ -149,6 +153,9 @@ export function respond(input: string, context: EngineContext): Reply {
   if (/\b(tips?|advice)\b/.test(text) && !genreAsked) return reply(genreTips(context.beat.genreId))
   if (genreAsked && /\b(tips?|advice)\b/.test(text)) return reply(genreTips(genreAsked))
 
+  const studio = respondStudio(text, context)
+  if (studio) return reply(studio.text, { ...studio, actions: studio.actions ?? [] })
+
   if (isQuestion(text)) {
     for (const [pattern, answer] of ANSWERS) if (pattern.test(text)) return reply(answer)
   }
@@ -156,7 +163,7 @@ export function respond(input: string, context: EngineContext): Reply {
   // Navigation.
   if (/\b(go|take me|open|show|switch)\b.*\bstem ?lab\b/.test(text)) return reply('Opening the Stem Lab.', { navigate: 'stems' })
   if (/\b(go|take me|back)\b.*\bhome\b|\blanding page\b/.test(text)) return reply('Heading home.', { navigate: 'home' })
-  const wantsBeatMaker = /\b(go|take me|open|show)\b.*\b(beat ?maker|studio)\b/.test(text)
+  const wantsBeatMaker = /\b(go|take me|open|show)\b.*\bbeat ?maker\b/.test(text)
 
   const actions: BeatAction[] = []
   const said: string[] = []
@@ -254,6 +261,7 @@ export function chipsFor(route: Route, beat: BeatStatus): string[] {
       beat.playing ? 'Stop' : 'Surprise me',
     ]
   }
+  if (route === 'studio') return ['Record a take', 'Play', 'Use the scream preset', 'Add a double track', 'Make the vocals reggaeton', 'Turn the click off', 'Export the mix', 'How do I fix latency?']
   if (route === 'stems') return ['What is the Stem Lab?', 'Take me to the Beat Maker', 'Make a punk beat']
-  return ['Make a post punk beat', 'Tell me about metal', 'What genres can you play?', 'How do I connect my MIDI keyboard?', 'What can you do?']
+  return ['Make a post punk beat', 'Open the studio', 'Tell me about metal', 'What genres can you play?', 'How do I connect my MIDI keyboard?', 'What can you do?']
 }

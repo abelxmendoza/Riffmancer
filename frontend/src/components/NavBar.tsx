@@ -7,6 +7,7 @@ import { BrandMark } from './BrandMark'
 const LINKS: { route: Route; label: string }[] = [
   { route: 'home', label: 'Home' },
   { route: 'beats', label: 'Beat Maker' },
+  { route: 'studio', label: 'Studio' },
   { route: 'stems', label: 'Stem Lab' },
 ]
 

@@ -12,6 +12,9 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
     "@vitejs/plugin-react": "latest",
+    "audiobuffer-to-wav": "^1.0.0",
+    "fflate": "^0.8.3",
+    "idb-keyval": "^6.3.0",
     "react": "latest",
     "react-dom": "latest",
     "tone": "15.1.22",

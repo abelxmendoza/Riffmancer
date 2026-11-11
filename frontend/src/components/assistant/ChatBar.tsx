@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { dispatchBeat, getBeatStatus, OPEN_ASSISTANT_EVENT, subscribeBeatStatus, type BeatStatus } from '../../assistant/bus'
+import { dispatchBeat, dispatchStudio, getBeatStatus, getStudioStatus, OPEN_ASSISTANT_EVENT, subscribeBeatStatus } from '../../assistant/bus'
 import { chipsFor, respond, type Mood } from '../../assistant/engine'
 import { askLive, probeLive, type LiveState } from '../../assistant/live'
 import { ASSISTANT_NAME, GREETING } from '../../assistant/persona'
@@ -41,7 +41,7 @@ export function ChatBar({ route }: { route: Route }) {
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState<{ mood: Mood; until: number }>()
-  const [beat, setBeat] = useState<BeatStatus>(getBeatStatus)
+  const [beat, setBeat] = useState(getBeatStatus)
   const [live, setLive] = useState<LiveState>('checking')
   const nextId = useRef(Date.now())
   const listRef = useRef<HTMLDivElement>(null)
@@ -74,7 +74,7 @@ export function ChatBar({ route }: { route: Route }) {
     const userMessage: ChatMessage = { id: nextId.current++, from: 'user', text }
     setMessages((current) => [...current, userMessage])
     const status = getBeatStatus()
-    const reply = respond(text, { route, beat: status })
+    const reply = respond(text, { route, beat: status, studio: getStudioStatus() })
 
     if (reply.unknown && live === 'live') {
       const pendingId = nextId.current++
@@ -97,6 +97,7 @@ export function ChatBar({ route }: { route: Route }) {
 
     if (reply.navigate && reply.navigate !== route) window.location.hash = hrefFor(reply.navigate)
     for (const action of reply.actions) dispatchBeat(action)
+    for (const action of reply.studioActions ?? []) dispatchStudio(action)
     setMessages((current) => [...current, { id: nextId.current++, from: 'bot', text: reply.text }])
     setFlash({ mood: reply.mood, until: Date.now() + (reply.mood === 'confused' ? 3000 : 2400) })
   }, [busy, live, messages, route])

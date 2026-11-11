@@ -16,6 +16,8 @@ const FEATURES = [
   { title: 'Real synthesizer', body: 'Fat saws, Reese bass, chorus guitars, 808 subs. Tweak with knobs named for humans.' },
   { title: 'Drum grid + pads', body: 'Finger-drum on pads, record hits straight into the beat, add fills and variations.' },
   { title: 'Record and download', body: 'Capture a take of everything you hear and download it in one click.' },
+  { title: 'Vocal Studio', body: 'Import an AI instrumental, record stacked vocal takes, and dial in genre vocal chains from post punk to screams to reggaeton delay throws.' },
+  { title: 'Mix and export', body: 'Master bus with glue and limiter, then export a WAV mix or a zip of stems for any DAW.' },
 ]
 
 export function Landing() {
@@ -35,6 +37,7 @@ export function Landing() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <a href={hrefFor('beats')} className="rounded-full bg-primary px-6 py-3 text-sm font-black uppercase tracking-wider text-background shadow-[0_0_30px_rgba(163,230,53,0.3)] hover:bg-secondary">Start making beats</a>
+              <a href={hrefFor('studio')} className="rounded-full border border-primary/60 px-6 py-3 text-sm font-black uppercase tracking-wider text-primary hover:bg-primary hover:text-background">Record vocals</a>
               <a href="#genres" onClick={(event) => { event.preventDefault(); document.getElementById('genres')?.scrollIntoView({ behavior: 'smooth' }) }} className="rounded-full border border-foreground/15 px-6 py-3 text-sm font-black uppercase tracking-wider text-foreground/80 hover:border-secondary hover:text-foreground">See the genres</a>
             </div>
             <p className="mt-6 text-xs text-foreground/40">Free, runs in your browser. Best in Chrome or Edge for MIDI.</p>
@@ -104,7 +107,8 @@ export function Landing() {
         <img src="/riffmancer-emblem.webp" width={220} height={220} alt="" className="mx-auto mb-6 w-44 rounded-2xl sm:w-56" />
         <p className="font-display text-3xl font-black uppercase text-foreground">Plug in. Press play. Riff.</p>
         <a href={hrefFor('beats')} className="mt-6 inline-block rounded-full bg-primary px-6 py-3 text-sm font-black uppercase tracking-wider text-background hover:bg-secondary">Open the Beat Maker</a>
-        <p className="mt-6 text-xs text-foreground/45">Got a finished song instead? <a className="font-bold text-secondary underline" href={hrefFor('stems')}>Split it into stems in the Stem Lab.</a></p>
+        <p className="mt-6 text-sm text-foreground/60">Got an instrumental? <a className="font-bold text-primary underline" href={hrefFor('studio')}>Record your vocals over it in the Studio</a>, with genre vocal presets and WAV export.</p>
+        <p className="mt-3 text-xs text-foreground/45">Got a finished song instead? <a className="font-bold text-secondary underline" href={hrefFor('stems')}>Split it into stems in the Stem Lab.</a></p>
       </section>
 
       <footer className="flex items-center gap-3 border-t border-foreground/10 pt-6 text-xs text-foreground/35"><img src="/riffmancer-emblem.webp" width={40} height={40} alt="" className="h-10 w-10 rounded-lg" /><span>Riffmancer · Sound powered by Tone.js · Made for musicians who just want to play.</span></footer>
