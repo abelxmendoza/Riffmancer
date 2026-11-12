@@ -1,7 +1,10 @@
 import * as Tone from 'tone'
 import type { DrumVoice, KitPatch } from '../genres'
 
-/** Synthesized drum kit, so no sample files or sample licenses are needed. */
+/**
+ * Synthesized drum kit, so no sample files are needed. Any drum can be swapped for a recorded
+ * hit (setSample), which then plays through the same drive, room and bus.
+ */
 export class DrumKit {
   readonly output = new Tone.Volume(0)
   private readonly bus = new Tone.Compressor({ threshold: -18, ratio: 4, attack: 0.003, release: 0.12 })
@@ -22,9 +25,12 @@ export class DrumKit {
   private readonly tomLow = new Tone.MembraneSynth({ octaves: 2, pitchDecay: 0.08, envelope: { attack: 0.001, decay: 0.45, sustain: 0, release: 0.1 } })
   private readonly lastTime = new Map<DrumVoice, number>()
   private kitPatch?: KitPatch
+  private readonly samples = new Map<DrumVoice, Tone.ToneAudioBuffer>()
+  private readonly sampleGain = new Tone.Gain(1)
 
   constructor() {
     this.drive.chain(this.room, this.bus, this.output)
+    this.sampleGain.connect(this.drive)
     this.kick.connect(this.drive)
     this.snareBody.connect(this.drive)
     this.snareNoise.chain(this.snareFilter, this.drive)
@@ -62,9 +68,31 @@ export class DrumKit {
     return safe
   }
 
+  /** Plays a recorded hit for this drum instead of the synth one; undefined goes back to the synth. */
+  setSample(voice: DrumVoice, buffer: AudioBuffer | undefined) {
+    if (buffer) this.samples.set(voice, new Tone.ToneAudioBuffer(buffer))
+    else this.samples.delete(voice)
+  }
+
+  hasSample(voice: DrumVoice) {
+    return this.samples.has(voice)
+  }
+
+  private playSample(voice: DrumVoice, buffer: Tone.ToneAudioBuffer, time: number, velocity: number) {
+    // Hats choke each other like on a real kit.
+    if (voice === 'closedHat') this.openHat.triggerRelease(time)
+    const source = new Tone.ToneBufferSource({ url: buffer, fadeOut: 0.01 })
+    const gain = new Tone.Gain(velocity * velocity).connect(this.sampleGain)
+    source.connect(gain)
+    source.onended = () => { source.dispose(); gain.dispose() }
+    source.start(time, 0, Math.min(buffer.duration, voice === 'crash' || voice === 'ride' ? 4 : 2))
+  }
+
   hit(voice: DrumVoice, time: number, velocity: number) {
     const t = this.at(voice, time)
     const v = Math.max(0.05, Math.min(1, velocity))
+    const sample = this.samples.get(voice)
+    if (sample) { this.playSample(voice, sample, t, v); return }
     switch (voice) {
       case 'kick':
         this.kick.triggerAttackRelease(this.kitPatch?.kickPitch ?? 32, 0.3, t, v)
@@ -102,6 +130,7 @@ export class DrumKit {
   }
 
   dispose() {
-    for (const node of [this.output, this.bus, this.drive, this.room, this.kick, this.snareBody, this.snareNoise, this.snareFilter, this.clap, this.clapFilter, this.rim, this.closedHat, this.openHat, this.ride, this.crash, this.tomHigh, this.tomLow]) node.dispose()
+    this.samples.clear()
+    for (const node of [this.sampleGain, this.output, this.bus, this.drive, this.room, this.kick, this.snareBody, this.snareNoise, this.snareFilter, this.clap, this.clapFilter, this.rim, this.closedHat, this.openHat, this.ride, this.crash, this.tomHigh, this.tomLow]) node.dispose()
   }
 }

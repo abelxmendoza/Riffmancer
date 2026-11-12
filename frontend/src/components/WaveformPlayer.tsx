@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useAppTheme } from '../theme/store'
 import WaveSurfer from 'wavesurfer.js'
 import { audioUrl } from '../services/api'
 import type { Project } from '../types'
@@ -6,6 +7,7 @@ import { formatBytes, formatSampleRate, formatTime } from '../lib/format'
 import { PauseIcon, PlayIcon } from './Icons'
 
 export function WaveformPlayer({ project }: { project: Project }) {
+  const theme = useAppTheme()
   const container = useRef<HTMLDivElement>(null)
   const wave = useRef<WaveSurfer | null>(null)
   const [playing, setPlaying] = useState(false)
@@ -23,9 +25,9 @@ export function WaveformPlayer({ project }: { project: Project }) {
       container: container.current,
       url: audioUrl(project.id),
       height: 152,
-      waveColor: '#22C55E',
-      progressColor: '#A3E635',
-      cursorColor: '#E5F7E7',
+      waveColor: theme.colors.secondary,
+      progressColor: theme.colors.primary,
+      cursorColor: theme.colors.foreground,
       cursorWidth: 1,
       barWidth: 2,
       barGap: 2,
@@ -40,7 +42,7 @@ export function WaveformPlayer({ project }: { project: Project }) {
     instance.on('finish', () => setPlaying(false))
     instance.on('error', () => setLoadError('This browser could not decode the audio. Try WAV, MP3, or M4A.'))
     return () => { instance.destroy(); wave.current = null }
-  }, [project.id])
+  }, [project.id, theme])
 
   const metadata = [
     ['Duration', formatTime(project.audio.duration_seconds)],

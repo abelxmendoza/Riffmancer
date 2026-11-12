@@ -14,6 +14,7 @@ import { Panel, Slider, Toggle } from '../beatmaker/Slider'
 import { FxPanel, MasterPanel } from './FxPanel'
 import { Timeline } from './Timeline'
 import { LevelMeter } from './Waveform'
+import { followGenre } from '../../theme/store'
 
 type EngineModule = typeof import('../../studio/engine/StudioEngine')
 type MixModule = typeof import('../../studio/engine/mixdown')
@@ -118,6 +119,7 @@ export function Studio() {
   }, [project, loaded])
 
   useEffect(() => { engineRef.current?.sync(project) }, [project])
+  useEffect(() => { followGenre(project.genre) }, [project.genre])
 
   const ensureEngine = useCallback(async (): Promise<StudioEngine> => {
     if (engineRef.current) return engineRef.current
@@ -496,7 +498,7 @@ export function Studio() {
       {(busy || notice) && <div role="status" className="rounded-2xl border border-primary/20 bg-primary/10 px-5 py-3 text-sm text-primary">{busy ?? notice}</div>}
       {!audioReady && project.tracks.every((track) => !track.clips.length) && (
         <section className="grid gap-4 rounded-3xl border border-dashed border-foreground/15 bg-foreground/[0.015] p-6 sm:grid-cols-[120px_minmax(0,1fr)] sm:items-center">
-          <img src="/riffmancer-emblem.webp" width={120} height={120} alt="" className="mx-auto w-28 rounded-2xl" />
+          <img src="/riffmancer-emblem.webp" width={120} height={120} alt="" className="emblem mx-auto hidden w-28 rounded-2xl sm:block" />
           <ol className="space-y-1.5 text-sm text-foreground/70">
             <li><strong className="text-foreground">1. Import</strong> your instrumental (a Suno MP3 or WAV, Stem Lab stems, or a Beat Maker take).</li>
             <li><strong className="text-foreground">2. Pick your genre</strong> above. Every vocal track gets that genre's chain.</li>

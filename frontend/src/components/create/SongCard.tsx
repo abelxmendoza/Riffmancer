@@ -1,4 +1,5 @@
-import { getGenre } from '../../beatmaker/genres'
+import { DRUM_VOICES, getGenre, type DrumVoice } from '../../beatmaker/genres'
+import { commercialOk, creditLine, sampleLabel, validSample, type SampleRef } from '../../song/samples'
 import { NOTE_NAMES, SCALE_LABELS } from '../../beatmaker/theory'
 import type { SongHistory } from '../../song/history'
 import { formatDuration, sectionName, type SectionKind, type SongSpec } from '../../song/spec'
@@ -44,6 +45,8 @@ interface SongCardProps {
   onRedo: () => void
   onVersion: (index: number) => void
   onToggleDrawer: () => void
+  /** Takes a real drum sample off, back to the synth drum. */
+  onRemoveSample?: (voice: DrumVoice) => void
   bouncing: boolean
   onSingOver: () => void
 }
@@ -53,6 +56,7 @@ export function SongCard(props: SongCardProps) {
   const { song, history, playing, position, selected, loopSection } = props
   const genre = getGenre(song.genreId)
   const key = `${NOTE_NAMES[song.root]} ${SCALE_LABELS[song.scale].split(' ')[0].toLowerCase()}`
+  const samples = DRUM_VOICES.flatMap((voice) => { const sample = validSample(song.samples?.[voice]); return sample ? [[voice, sample] as [DrumVoice, SampleRef]] : [] })
   const selectedIndex = selected !== undefined && selected < song.sections.length ? selected : undefined
   return (
     <section aria-label="Your song" className="rounded-3xl border border-foreground/10 bg-surface p-4 sm:p-5">
@@ -102,6 +106,24 @@ export function SongCard(props: SongCardProps) {
           <button type="button" onClick={() => props.onPlayFrom(selectedIndex)} className="rounded-full border border-foreground/15 px-3 py-1.5 font-bold text-foreground/75 hover:border-primary hover:text-foreground">▶ Play from here</button>
           <button type="button" onClick={() => props.onLoop(loopSection === selectedIndex ? undefined : selectedIndex)} aria-pressed={loopSection === selectedIndex} className={`rounded-full border px-3 py-1.5 font-bold ${loopSection === selectedIndex ? 'border-primary bg-primary text-background' : 'border-foreground/15 text-foreground/75 hover:border-primary hover:text-foreground'}`}>⟲ Loop it</button>
           <button type="button" onClick={() => props.onAskAbout(selectedIndex)} className="rounded-full border border-foreground/15 px-3 py-1.5 font-bold text-foreground/75 hover:border-primary hover:text-foreground">Ask Fret to change it</button>
+        </div>
+      )}
+
+      {samples.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-foreground/10 bg-background/40 px-3 py-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/50">Real drums · from Freesound</p>
+          <ul className="mt-1 space-y-1">
+            {samples.map(([voice, sample]) => (
+              <li key={voice} className="flex items-center gap-2 text-xs">
+                <span className="w-20 shrink-0 font-bold capitalize text-foreground/80">{sampleLabel(voice)}</span>
+                <a href={sample.page} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-foreground/65 underline decoration-foreground/20 underline-offset-2 hover:text-foreground" title={creditLine(sample)}>
+                  "{sample.name}" by {sample.author}
+                </a>
+                <span title={commercialOk(sample.license) ? (sample.license === 'CC0' ? 'Free to use, no credit needed' : 'Free to use with credit to the author') : 'Not for commercial releases'} className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${sample.license === 'CC0' ? 'bg-primary/15 text-primary' : commercialOk(sample.license) ? 'bg-foreground/10 text-foreground/70' : 'bg-red-500/15 text-red-300'}`}>{sample.license}</span>
+                {props.onRemoveSample && <button type="button" onClick={() => props.onRemoveSample?.(voice)} aria-label={`Back to the synth ${sampleLabel(voice)}`} title="Back to the synth drum" className="shrink-0 rounded-full px-1.5 text-foreground/45 hover:text-foreground">×</button>}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

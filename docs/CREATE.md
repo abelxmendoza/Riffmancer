@@ -23,7 +23,21 @@ Describe it like Suno: "shoegaze song with fuzzy wide guitars and a deep sub bas
 
 ## Next steps (planned)
 
-1. Sampled drum kits and instruments per genre (replacing the synthesized sounds).
+1. Sampled instruments beyond drums, and CC0 starter kits that work without a key.
 2. Record or upload audio, analyse it in the browser (tempo, key, chords, energy) and write a similar original song.
 3. Send to Studio, WAV/MIDI export, show in the Player library.
 4. Optional AI audio rendering.
+
+## Real drums from Freesound
+
+- `song/samples.ts` (pure): `SampleRef`, how to search Freesound for one drum (`sampleSearch`), licence reading (`licenseOf`, `commercialOk`, `creditLine`), and how Fret reads "use a real snare" or "back to synth drums".
+- A song stores its samples in `SongSpec.samples` (one per drum). The `set_sample` edit puts one on or takes it off; only `cdn.freesound.org` previews are accepted.
+- `api/sounds.ts` is the Vercel function that searches with `FREESOUND_API_KEY` (server only) and can proxy a preview if the CDN blocks the browser. Searches default to CC0 and CC BY sounds, which are fine for releases (CC BY needs a credit, shown on the song card).
+- `services/freesound.ts` calls it; `useSongPlayer` downloads and decodes each sample once, and `DrumKit.setSample` plays it through the kit's drive, room and bus instead of the synth drum.
+- In the chat: "use a real snare, trashy", "real recorded drums", "another snare", "back to synth drums".
+
+## Colour themes
+
+- `theme/themes.ts` has six themes, one per genre (ids match the Player's visualizer themes). `theme/store.ts` saves the choice and writes the colours as CSS variables on `<html>`; Tailwind's `bg-primary`, `text-foreground/60` and so on read them, so every screen follows.
+- "Match my song" (on by default) switches the theme when the Create song or Studio session changes genre. Fret understands "blood moon theme", "make it look punk" and "match my song".
+- The skull artwork is recoloured per theme with a CSS filter (`.emblem`); Blood Moon uses an SVG colour matrix in `index.html`.

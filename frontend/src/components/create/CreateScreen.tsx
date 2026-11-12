@@ -4,12 +4,16 @@ import type { Mood } from '../../assistant/engine'
 import { askSongLive, probeSongLive } from '../../assistant/liveSong'
 import type { LiveState } from '../../assistant/live'
 import { ASSISTANT_NAME } from '../../assistant/persona'
-import { describeOutcome, genreButtons, respondSong, vocalPresetForSong, type PlayCommand } from '../../assistant/songBrain'
+import { describeOutcome, genreButtons, respondSong, vocalPresetForSong, type PlayCommand, type SongReply } from '../../assistant/songBrain'
+import type { DrumVoice } from '../../beatmaker/genres/types'
+import { sampleLabel, type SampleRef } from '../../song/samples'
+import { searchSamples } from '../../services/freesound'
 import { sendToStudio } from '../../studio/storage'
 import { applyEdits, type SongEdit } from '../../song/edit'
 import { generateSong } from '../../song/generate'
 import { commit, currentVersion, goTo, loadHistory, redo, saveHistory, undo, type SongHistory } from '../../song/history'
 import { sectionName, type SongSpec } from '../../song/spec'
+import { applyThemeRequest, followGenre } from '../../theme/store'
 import { FretBot } from '../assistant/FretBot'
 import { SongCard } from './SongCard'
 import { UnderTheHood } from './UnderTheHood'
@@ -41,7 +45,7 @@ const DESCRIBE_IDEAS = [
   'Doom song with huge fuzz guitars',
 ]
 
-const QUICK_ASKS = ['Heavier', 'Faster', 'New drums', 'Fuzzier guitars', 'Deep 808 bass', 'Roomy live drums', 'Another chorus', 'Half-time breakdown', 'Surprise me']
+const QUICK_ASKS = ['Heavier', 'Faster', 'Real recorded drums', 'New drums', 'Fuzzier guitars', 'Deep 808 bass', 'Roomy live drums', 'Another chorus', 'Half-time breakdown', 'Surprise me']
 
 /** The main screen: talk to Fret, Fret writes and edits the song. Manual controls live under the hood. */
 export function CreateScreen() {
@@ -62,6 +66,7 @@ export function CreateScreen() {
   const player = useSongPlayer(song)
 
   useEffect(() => { saveHistory(history) }, [history])
+  useEffect(() => { followGenre(song?.genreId) }, [song?.genreId])
   useEffect(() => {
     try { window.localStorage.setItem(MESSAGES_KEY, JSON.stringify(messages.filter((message) => !message.pending).slice(-40))) } catch { /* storage blocked */ }
   }, [messages])
@@ -112,6 +117,48 @@ export function CreateScreen() {
     }
   }, [player]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** Search results per drum, so "another snare" moves to the next one instead of searching again. */
+  const sampleCursor = useRef(new Map<DrumVoice, { description: string; results: SampleRef[]; index: number; page: number; more: boolean }>())
+
+  /** Finds real hits on Freesound for each drum and puts the best match in. */
+  const findSamples = useCallback(async (request: NonNullable<SongReply['samples']>, base: SongSpec) => {
+    const pendingId = nextId.current++
+    setMessages((current) => [...current, { id: pendingId, from: 'bot', text: `🔎 Digging through Freesound for ${request.voices.map(sampleLabel).join(', ')}…`, pending: true }])
+    setBusy(true)
+    const edits: SongEdit[] = []
+    const misses: string[] = []
+    let problem: string | undefined
+    try {
+      for (const voice of request.voices) {
+        const previous = sampleCursor.current.get(voice)
+        let cursor = request.next && previous ? { ...previous, index: previous.index + 1 } : { description: request.description, results: [] as SampleRef[], index: 0, page: 0, more: true }
+        if (cursor.index >= cursor.results.length) {
+          if (!cursor.more) cursor = { ...cursor, index: 0 }
+          else {
+            const found = await searchSamples(voice, cursor.description, cursor.page + 1)
+            cursor = { ...cursor, results: [...cursor.results, ...found.results], page: cursor.page + 1, more: found.more }
+          }
+        }
+        // Skip the one already in the song when asking for another.
+        if (cursor.results[cursor.index]?.id === base.samples?.[voice]?.id && cursor.index + 1 < cursor.results.length) cursor.index += 1
+        sampleCursor.current.set(voice, cursor)
+        const pick = cursor.results[cursor.index]
+        if (pick) edits.push({ type: 'set_sample', voice, sample: pick })
+        else misses.push(sampleLabel(voice))
+      }
+    } catch (reason) {
+      problem = reason instanceof Error ? reason.message : 'Sample search failed.'
+    }
+    const result = runEdits(edits, base)
+    const credit = edits.some((edit) => edit.type === 'set_sample' && edit.sample?.license === 'CC BY') ? ' CC BY sounds need a credit if you release the song; the credits are on the song card.' : ''
+    const miss = misses.length ? ` Found nothing for "${[request.description, misses.join(', ')].filter(Boolean).join(' ')}", try other words.` : ''
+    const body = [edits.length ? `${result.text}${credit} Say "another ${sampleLabel(request.voices[0]).split(' ').pop()}" to hear the next one, or "back to synth drums".` : '', miss, problem ?? ''].filter(Boolean).join(' ').trim()
+    setMessages((current) => current.map((message) => (message.id === pendingId ? { id: pendingId, from: 'bot', text: body || 'No samples found.' } : message)))
+    setFlash(edits.length ? 'ready' : 'confused')
+    setBusy(false)
+    if (edits.length && result.song && !player.playing) runPlay({ type: 'play' }, result.song)
+  }, [player.playing, runEdits, runPlay])
+
   const send = useCallback(async (raw: string) => {
     const text = raw.trim()
     if (!text || busy) return
@@ -153,6 +200,17 @@ export function CreateScreen() {
       return
     }
 
+    if (reply.samples && base) {
+      await findSamples(reply.samples, base)
+      return
+    }
+
+    if (reply.theme) {
+      applyThemeRequest(reply.theme)
+      addBot(reply.text)
+      return
+    }
+
     if (reply.history) {
       setHistory((current) => (reply.history === 'undo' ? undo(current) : redo(current)))
       addBot(reply.text)
@@ -165,7 +223,7 @@ export function CreateScreen() {
     setFlash(reply.mood)
     if (isNew) { player.setLoopSection(undefined); setSelected(undefined) }
     runPlay(reply.play, result.song ?? base)
-  }, [busy, live, messages, player, runEdits, runPlay, singOver])
+  }, [busy, live, messages, player, runEdits, runPlay, singOver, findSamples])
 
   const sendRef = useRef(send)
   sendRef.current = send
@@ -211,6 +269,7 @@ export function CreateScreen() {
             onRedo={() => setHistory(redo)}
             onVersion={(index) => setHistory((current) => goTo(current, index))}
             onToggleDrawer={() => setDrawerOpen((open) => !open)}
+            onRemoveSample={(voice) => handEdit({ type: 'set_sample', voice }, `synth ${sampleLabel(voice)} back`)}
             bouncing={player.bouncing}
             onSingOver={() => { if (player.bouncing) player.stop(); else { addBot(`🎤 Recording "${song.title}" into the Studio. It plays through once, then the Studio opens with a vocal preset that fits.`); void singOver(song) } }}
           />

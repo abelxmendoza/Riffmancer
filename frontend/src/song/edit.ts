@@ -1,5 +1,5 @@
 import type { MixPart, SynthPart } from '../beatmaker/engine/types'
-import { allPatches, getGenre, GENRES, type DrumPatternText } from '../beatmaker/genres'
+import { allPatches, DRUM_LABELS, DRUM_VOICES, getGenre, GENRES, type DrumPatternText, type DrumVoice } from '../beatmaker/genres'
 import { NOTE_NAMES, SCALE_LABELS, SCALES, type ScaleName } from '../beatmaker/theory'
 import { SYNTH_TWEAKS, tweakPatch, type SynthTweak } from '../beatmaker/tweak'
 import {
@@ -9,6 +9,7 @@ import {
 import { nextSeed, pick, seededRandom, type Random } from './random'
 import { applyKitSettings, applyPatchSettings, designKit, designPatch, SOUND_PARTS, type SoundPart } from './sound'
 import { getStyle, type Style } from './styles'
+import { validSample, type SampleRef } from './samples'
 import {
   MAX_BARS, MAX_SECTIONS, SECTION_KINDS, SECTION_LABELS, sectionName, sectionProblems, SONG_PARTS,
   type Energy, type Section, type SectionKind, type SectionParts, type SongSpec,
@@ -52,6 +53,8 @@ export type SongEdit =
   | { type: 'set_sound'; part: SynthPart; preset: string }
   | { type: 'set_level'; part: MixPart; level: number }
   | { type: 'design_sound'; part: SoundPart; description?: string; settings?: Record<string, unknown> }
+  /** Puts a real recorded hit on one drum, or takes it off (no sample) to go back to the synth drum. */
+  | { type: 'set_sample'; voice: DrumVoice; sample?: SampleRef }
 
 /** Plain-word sound descriptions per part, e.g. { chords: 'fuzzy wide guitars', bass: 'deep 808' }. */
 export type SoundDescriptions = Partial<Record<SoundPart, string>>
@@ -361,6 +364,20 @@ export function applyEdit(song: SongSpec, edit: SongEdit): EditResult {
       let patch = designed?.patch ?? { ...song.sounds[edit.part], name: `${song.sounds[edit.part].name.replace(/ \(edited\)$/, '')} (edited)` }
       if (settings) patch = applyPatchSettings(patch, settings)
       return { song: { ...song, sounds: { ...song.sounds, [edit.part]: patch } }, summary: `gave the ${partName} ${designed ? `${article(designed.label)} ${designed.label} sound` : 'a new sound'}` }
+    }
+    case 'set_sample': {
+      if (!DRUM_VOICES.includes(edit.voice)) fail(`unknown drum "${edit.voice}"`)
+      const label = DRUM_LABELS[edit.voice].toLowerCase()
+      const samples = { ...song.samples }
+      if (edit.sample === undefined) {
+        if (!samples[edit.voice]) fail(`the ${label} is already the synth one`)
+        delete samples[edit.voice]
+        return { song: { ...song, samples: Object.keys(samples).length ? samples : undefined }, summary: `put the synth ${label} back` }
+      }
+      const sample = validSample(edit.sample)
+      if (!sample) fail('that sample is not a Freesound preview I can load')
+      samples[edit.voice] = sample
+      return { song: { ...song, samples }, summary: `put a real ${label} on: "${sample!.name}" by ${sample!.author} (${sample!.license})` }
     }
     default:
       return fail(`unknown change "${(edit as { type?: string }).type}"`)

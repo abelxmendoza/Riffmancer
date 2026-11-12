@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AudioEngine } from '../../beatmaker/engine/AudioEngine'
 import type { MixPart, SynthPart } from '../../beatmaker/engine/types'
-import type { DrumVoice } from '../../beatmaker/genres'
+import { DRUM_VOICES, type DrumVoice } from '../../beatmaker/genres/types'
+import { validSample } from '../../song/samples'
+import { sampleBytes } from '../../services/freesound'
 import type { SongConductor, SongTick } from '../../song/player'
 import type { SongSpec } from '../../song/spec'
 
@@ -75,6 +77,25 @@ export function useSongPlayer(song: SongSpec | undefined) {
     for (const [part, level] of Object.entries(song.levels)) engine.setLevel(part as MixPart, level)
   }, [song, ready])
 
+  // Real recorded drum hits: download and decode each one once, and swap them in.
+  const loadedSamples = useRef(new Map<DrumVoice, string>())
+  const [sampleError, setSampleError] = useState<string>()
+  useEffect(() => {
+    const engine = engineRef.current
+    if (!engine || !song) return
+    const loaded = loadedSamples.current
+    for (const voice of DRUM_VOICES) {
+      const url = validSample(song.samples?.[voice])?.url
+      if (loaded.get(voice) === url) continue
+      if (!url) { engine.setDrumSample(voice, undefined); loaded.delete(voice); continue }
+      loaded.set(voice, url)
+      sampleBytes(url)
+        .then((bytes) => engine.decode(bytes))
+        .then((buffer) => { if (loaded.get(voice) === url) engine.setDrumSample(voice, buffer) })
+        .catch(() => { loaded.delete(voice); setSampleError(`Couldn't load the ${voice} sample, so the synth one plays instead.`) })
+    }
+  }, [song, ready])
+
   const play = useCallback(async (sectionIndex = 0) => {
     try {
       const engine = await ensureEngine()
@@ -132,5 +153,5 @@ export function useSongPlayer(song: SongSpec | undefined) {
     try { (await ensureEngine()).hitDrum(voice, 0.9) } catch { /* reported */ }
   }, [ensureEngine])
 
-  return { ready, error, playing, position, loopSection, bouncing, play, stop, setLoopSection, audition, bounce }
+  return { ready, error: error ?? sampleError, playing, position, loopSection, bouncing, play, stop, setLoopSection, audition, bounce }
 }

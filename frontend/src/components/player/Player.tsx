@@ -4,6 +4,7 @@ import { renderDemoTrack } from '../../player/demo'
 import { PlayerEngine } from '../../player/engine'
 import { isAudioFile, nextIndex, previousIndex, shuffledOrder, titleFromFileName, type RepeatMode, type Track } from '../../player/playlist'
 import { THEMES } from '../../player/themes'
+import { setTheme, useThemeState } from '../../theme/store'
 import { VISUAL_MODES } from '../../player/visualizers'
 import { formatTime } from '../../lib/format'
 import { MusicIcon, PauseIcon, PlayIcon, UploadIcon } from '../Icons'
@@ -58,6 +59,9 @@ export function Player() {
   state.current = { tracks, current, repeat, order, settings }
 
   const update = (patch: Partial<Settings>) => setSettings((value) => ({ ...value, ...patch }))
+  // The visualizer colours are the app's colour theme: one choice, everywhere.
+  const appThemeId = useThemeState().id
+  useEffect(() => { setSettings((value) => (value.themeId === appThemeId ? value : { ...value, themeId: appThemeId })) }, [appThemeId])
   useEffect(() => {
     try { window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)) } catch { /* private mode */ }
     audio.volume = settings.volume
@@ -221,7 +225,7 @@ export function Player() {
       case 'next': skip(1); break
       case 'previous': skip(-1); break
       case 'visual': cycleVisual(action.id); break
-      case 'theme': update({ themeId: action.id }); break
+      case 'theme': setTheme(action.id); break
       case 'fullscreen': toggleFullscreen(); break
       case 'demo': void addDemo(); break
     }
@@ -242,7 +246,7 @@ export function Player() {
       else if (key === 'f') toggleFullscreen()
       else if (key === 't') {
         const position = THEMES.findIndex((theme) => theme.id === state.current.settings.themeId)
-        update({ themeId: THEMES[(position + 1) % THEMES.length].id })
+        setTheme(THEMES[(position + 1) % THEMES.length].id)
       }
     }
     window.addEventListener('keydown', down)
@@ -359,7 +363,7 @@ export function Player() {
             <h3 className="mt-4 text-[11px] font-black uppercase tracking-[0.2em] text-foreground/50">Colours</h3>
             <div className="mt-2 flex flex-wrap gap-2">
               {THEMES.map((theme) => (
-                <button key={theme.id} type="button" onClick={() => update({ themeId: theme.id })} aria-pressed={settings.themeId === theme.id} title={`${theme.name} (${theme.vibe})`} className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-[11px] font-bold transition ${settings.themeId === theme.id ? 'border-foreground/60 text-foreground' : 'border-foreground/10 text-foreground/55 hover:border-foreground/30'}`}>
+                <button key={theme.id} type="button" onClick={() => setTheme(theme.id)} aria-pressed={settings.themeId === theme.id} title={`${theme.name} (${theme.vibe})`} className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-[11px] font-bold transition ${settings.themeId === theme.id ? 'border-foreground/60 text-foreground' : 'border-foreground/10 text-foreground/55 hover:border-foreground/30'}`}>
                   <span className="h-5 w-5 rounded-full" style={{ background: `linear-gradient(135deg, ${theme.colors[1]}, ${theme.colors[2]}, ${theme.colors[3]})` }} />
                   {theme.name}
                 </button>

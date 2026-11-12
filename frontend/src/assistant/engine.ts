@@ -5,6 +5,7 @@ import type { BeatAction, BeatStatus, StudioAction, StudioStatus, SynthTweak } f
 import { respondStudio } from './studioBrain'
 import type { PlayerAction } from '../player/bus'
 import { THEMES } from '../player/themes'
+import { themeReply } from '../theme/themes'
 import { ASSISTANT_NAME } from './persona'
 
 export type Mood = 'idle' | 'listening' | 'thinking' | 'ready' | 'rocking' | 'confused'
@@ -22,6 +23,8 @@ export interface Reply {
   /** True when the built-in brain didn't understand; the live model may take over. */
   unknown: boolean
   mood: Mood
+  /** Change the app's colour theme. */
+  theme?: { themeId?: string; follow?: boolean }
 }
 
 export interface EngineContext {
@@ -192,6 +195,9 @@ export function respond(input: string, context: EngineContext): Reply {
 
   if (/\b(tips?|advice)\b/.test(text) && !genreAsked) return reply(genreTips(context.beat.genreId))
   if (genreAsked && /\b(tips?|advice)\b/.test(text)) return reply(genreTips(genreAsked))
+
+  const look = themeReply(text)
+  if (look) return reply(look.text, { theme: look.theme })
 
   const studio = respondStudio(text, context)
   if (studio) return reply(studio.text, { ...studio, actions: studio.actions ?? [] })

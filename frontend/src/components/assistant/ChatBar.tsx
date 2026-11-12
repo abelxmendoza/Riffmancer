@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { applyThemeRequest } from '../../theme/store'
 import { dispatchBeat, dispatchSongPrompt, dispatchStudio, getBeatStatus, getStudioStatus, OPEN_ASSISTANT_EVENT, subscribeBeatStatus } from '../../assistant/bus'
 import { chipsFor, respond, type Mood } from '../../assistant/engine'
 import { dispatchPlayer } from '../../player/bus'
@@ -112,6 +113,7 @@ export function ChatBar({ route }: { route: Route }) {
     for (const action of reply.actions) dispatchBeat(action)
     for (const action of reply.studioActions ?? []) dispatchStudio(action)
     for (const action of reply.playerActions ?? []) dispatchPlayer(action)
+    if (reply.theme) applyThemeRequest(reply.theme)
     setMessages((current) => [...current, { id: nextId.current++, from: 'bot', text: reply.text }])
     setFlash({ mood: reply.mood, until: Date.now() + (reply.mood === 'confused' ? 3000 : 2400) })
   }, [busy, live, messages, route])

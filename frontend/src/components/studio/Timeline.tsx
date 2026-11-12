@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { activeTake, type Clip, type StudioProject, type Track } from '../../studio/project'
 import { secondsPerBar, snapToBeat } from '../../studio/timing'
 import { Waveform } from './Waveform'
+import { useAppTheme } from '../../theme/store'
 
 const WIDE_HEADER = 232
 const NARROW_HEADER = 150
@@ -55,7 +56,7 @@ export function Timeline(props: TimelineProps) {
         ))}
         {props.project.tracks.length === 0 && <p className="p-6 text-sm text-foreground/50">No tracks yet. Import an instrumental or add a vocal track.</p>}
         {/* Playhead, moved by the Studio every frame without re-rendering. */}
-        <div ref={props.playheadRef} className="pointer-events-none absolute bottom-0 top-0 z-10 w-px bg-primary shadow-[0_0_8px_#A3E635]" style={{ left: HEADER }} />
+        <div ref={props.playheadRef} className="pointer-events-none absolute bottom-0 top-0 z-10 w-px bg-primary shadow-[0_0_8px_var(--color-primary)]" style={{ left: HEADER }} />
       </div>
     </div>
   )
@@ -88,6 +89,7 @@ function TrackRow({ track, width, bar, header, ...props }: TimelineProps & { tra
 }
 
 function ClipView({ clip, track, ...props }: TimelineProps & { clip: Clip; track: Track }) {
+  const accent = useAppTheme().colors.primary
   const take = activeTake(clip)
   const pps = props.pixelsPerSecond
   const length = Math.max(0.05, take.duration - clip.offset)
@@ -123,7 +125,7 @@ function ClipView({ clip, track, ...props }: TimelineProps & { clip: Clip; track
       }}
     >
       <span className="absolute left-1.5 top-0.5 z-10 truncate text-[10px] font-bold text-foreground/80">{take.name}{clip.takes.length > 1 ? ` · ${clip.takes.length} takes` : ''}</span>
-      <Waveform buffer={props.buffers.get(take.audioId)} from={clip.offset} to={take.duration} width={length * pps} height={LANE - 14} color={vocal ? '#A3E635' : '#7DD3FC'} />
+      <Waveform buffer={props.buffers.get(take.audioId)} from={clip.offset} to={take.duration} width={length * pps} height={LANE - 14} color={vocal ? accent : '#7DD3FC'} />
     </div>
   )
 }

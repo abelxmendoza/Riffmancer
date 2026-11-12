@@ -3,6 +3,7 @@ import { openAssistant } from '../assistant/bus'
 import { hrefFor, type Route } from '../lib/route'
 import { FretBot } from './assistant/FretBot'
 import { BrandMark } from './BrandMark'
+import { ThemeChoices, ThemePicker } from './ThemePicker'
 
 const LINKS: { route: Route; label: string }[] = [
   { route: 'home', label: 'Home' },
@@ -45,6 +46,7 @@ export function NavBar({ route }: { route: Route }) {
           {LINKS.map((item) => link(item))}
         </div>
         <div className="hidden items-center gap-2 md:flex">
+          <ThemePicker />
           <button type="button" onClick={openAssistant} className="flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 py-1 pl-1.5 pr-4 text-xs font-black uppercase tracking-wider text-primary transition hover:bg-primary/20">
             <FretBot size={26} />
             Ask Fret
@@ -73,6 +75,10 @@ export function NavBar({ route }: { route: Route }) {
             <FretBot size={30} mood="ready" />
             Ask Fret
           </button>
+          <div className="px-1 pt-2">
+            <p className="mb-2 px-1 text-[10px] font-black uppercase tracking-[0.2em] text-foreground/50">Colour theme</p>
+            <ThemeChoices onPick={() => setOpen(false)} />
+          </div>
         </div>
       )}
     </header>

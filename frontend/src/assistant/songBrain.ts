@@ -1,4 +1,7 @@
 import { getGenre, GENRES } from '../beatmaker/genres'
+import { parseRemoveSamples, parseSampleRequest, sampleLabel } from '../song/samples'
+import { DRUM_VOICES, type DrumVoice } from '../beatmaker/genres/types'
+import { themeReply } from '../theme/themes'
 import type { ScaleName } from '../beatmaker/theory'
 import type { SongEdit, SoundDescriptions, Target } from '../song/edit'
 import { describesSound, parseSoundRequests, type SoundRequest } from '../song/sound'
@@ -31,6 +34,10 @@ export interface SongReply {
   studio?: StudioAction[]
   /** Bounce the song and open it in the Studio to record vocals over it. */
   sendToStudio?: boolean
+  /** Change the app's colour theme. */
+  theme?: { themeId?: string; follow?: boolean }
+  /** Search Freesound for real drum hits and put the best one on each drum (next: the next result). */
+  samples?: { voices: DrumVoice[]; description: string; next?: boolean }
 }
 
 const VOCAL_TALK = /\b(vocals?|voice|singing|sing|vocal preset|mic)\b/
@@ -150,8 +157,18 @@ export function respondSong(input: string, song: SongSpec | undefined): SongRepl
   }
   if (/^(thanks|thank you|thx|ty|cheers|nice|awesome|sick|rad|love it|perfect)\b/.test(text)) return reply('🤘 Anytime. Keep it loud.')
 
+  // "Back to synth drums" before "back" means undo.
+  const removeSamples = song?.samples ? parseRemoveSamples(text) : undefined
+  if (song && removeSamples) {
+    const voices = (removeSamples === 'all' ? DRUM_VOICES : removeSamples).filter((voice) => song.samples?.[voice])
+    if (voices.length) return reply('', { edits: voices.map((voice) => ({ type: 'set_sample', voice }) satisfies SongEdit), mood: 'ready' })
+  }
+
   if (/^(undo|go back|back|nah|revert|previous version|take that back)\b|\bundo (that|it)\b/.test(text)) return reply('Undone. Back to the version before.', { history: 'undo' })
   if (/^redo\b/.test(text)) return reply('Redone.', { history: 'redo' })
+
+  const look = themeReply(text)
+  if (look) return reply(look.text, { theme: look.theme })
 
   // Vocals: presets for this song, described vocal sounds, and sending the song to the Studio.
   if (COPY_VOCAL.test(text)) {
@@ -170,6 +187,16 @@ export function respondSong(input: string, song: SongSpec | undefined): SongRepl
     if (/\b(preset|effects?|chain|sound|reverb|delay|echo|distort|dreamy|wide|bright|dark|deep|doubled|dry|telephone|megaphone|auto ?tune|what should|how should)\b/.test(text)) {
       return reply(`Made the vocal preset "${vocal.action.name}"${sound} and saved it under Your presets in the Studio.${missing} Say "record vocals over this" to take the song there and sing.`, { studio })
     }
+  }
+
+  // Real recorded drums from Freesound.
+  const sampleAsk = parseSampleRequest(text)
+  const anotherSample = song?.samples && /\b(another|different|next|other)\b/.test(text) ? DRUM_VOICES.filter((voice) => song.samples?.[voice] && new RegExp(`\\b${sampleLabel(voice).split(' ').pop()}s?\\b`).test(text)) : []
+  if (sampleAsk || anotherSample.length) {
+    if (!song) return reply(`Let's make a song first, then I'll dig up real drums for it. Try "make a punk song".`, { mood: 'confused' })
+    const voices = anotherSample.length ? anotherSample : sampleAsk!.voices
+    const names = voices.map(sampleLabel).join(', ')
+    return reply(`🔎 Digging through Freesound for ${anotherSample.length ? 'another ' : 'a real '}${names}…`, { samples: { voices, description: anotherSample.length ? '' : sampleAsk!.description, next: anotherSample.length > 0 }, mood: 'thinking' })
   }
 
   const genreAsked = findGenre(text)
