@@ -1,5 +1,8 @@
 import type { KeyboardMode } from '../beatmaker/input/keymap'
 import type { ScaleName } from '../beatmaker/theory'
+import type { SynthTweak } from '../beatmaker/tweak'
+
+export type { SynthTweak }
 
 /** Things the assistant can do to the Beat Maker. */
 export type BeatAction =
@@ -17,7 +20,6 @@ export type BeatAction =
   | { type: 'synth'; tweak: SynthTweak }
   | { type: 'record'; on: boolean }
 
-export type SynthTweak = 'darker' | 'brighter' | 'heavier' | 'cleaner' | 'spacier' | 'drier' | 'wider'
 
 export interface BeatStatus {
   ready: boolean
@@ -126,4 +128,24 @@ export function getStudioStatus(): StudioStatus {
 export function subscribeStudioStatus(listener: (status: StudioStatus) => void): () => void {
   studioListeners.add(listener)
   return () => { studioListeners.delete(listener) }
+}
+
+type PromptHandler = (text: string) => void
+let promptHandler: PromptHandler | undefined
+let pendingPrompt: string | undefined
+
+/** Sends a request to Fret on the Create screen, or holds it until that screen opens. */
+export function dispatchSongPrompt(text: string) {
+  if (promptHandler) promptHandler(text)
+  else pendingPrompt = text
+}
+
+export function registerSongPromptHandler(next: PromptHandler): () => void {
+  promptHandler = next
+  if (pendingPrompt) {
+    const text = pendingPrompt
+    pendingPrompt = undefined
+    next(text)
+  }
+  return () => { if (promptHandler === next) promptHandler = undefined }
 }

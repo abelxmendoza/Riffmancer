@@ -9,6 +9,7 @@ import { SeparationWorkspace } from './components/SeparationWorkspace'
 import { BeatMaker } from './components/beatmaker/BeatMaker'
 import { Studio } from './components/studio/Studio'
 import { Player } from './components/player/Player'
+import { CreateScreen } from './components/create/CreateScreen'
 import { listProjects, uploadProject } from './services/api'
 import type { Project } from './types'
 
@@ -65,14 +66,15 @@ export default function App() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <NavBar route={route} />
-      <div className="mx-auto max-w-[1500px] p-4 pb-32 sm:p-6 sm:pb-32">
+      <div className={`mx-auto max-w-[1500px] p-4 sm:p-6 ${route === 'create' ? 'pb-10' : 'pb-32 sm:pb-32'}`}>
         {route === 'home' && <Landing />}
+        {route === 'create' && <CreateScreen />}
         {route === 'beats' && <BeatMaker />}
         {route === 'studio' && <Studio />}
         {route === 'stems' && <StemLab />}
         {route === 'player' && <Player />}
       </div>
-      <ChatBar route={route} />
+      {route !== 'create' && <ChatBar route={route} />}
     </div>
   )
 }

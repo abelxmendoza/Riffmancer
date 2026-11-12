@@ -26,6 +26,16 @@ export function parseDrumPattern(text: DrumPatternText): DrumGrid {
   return grid
 }
 
+/** The reverse of parseDrumPattern: back to one text line per drum (silent drums left out). */
+export function gridToPattern(grid: DrumGrid): DrumPatternText {
+  const text: DrumPatternText = {}
+  for (const voice of DRUM_VOICES) {
+    if (!grid[voice].some((velocity) => velocity > 0)) continue
+    text[voice] = grid[voice].map((velocity) => (velocity >= ACCENT ? 'X' : velocity > GHOST ? 'x' : velocity > 0 ? 'o' : '.')).join('')
+  }
+  return text
+}
+
 export function cloneGrid(grid: DrumGrid): DrumGrid {
   return Object.fromEntries(DRUM_VOICES.map((voice) => [voice, [...grid[voice]]])) as DrumGrid
 }
@@ -61,6 +71,7 @@ export type BandEvent =
   | { part: 'drums'; voice: DrumVoice; velocity: number }
   | { part: 'bass'; notes: number[]; steps: number; velocity: number }
   | { part: 'chords'; notes: number[]; steps: number; velocity: number; muted: boolean }
+  | { part: 'lead'; notes: number[]; steps: number; velocity: number }
 
 export interface Harmony {
   root: number

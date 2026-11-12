@@ -1,0 +1,234 @@
+import { getGenre, GENRES } from '../beatmaker/genres'
+import type { ScaleName } from '../beatmaker/theory'
+import type { SongEdit, Target } from '../song/edit'
+import type { SectionKind, SectionParts, SongSpec } from '../song/spec'
+import { findGenre, findKey, findSynthTweak, findTempo, normalize, type Mood } from './engine'
+import { ASSISTANT_NAME } from './persona'
+
+/**
+ * Fret's offline brain for the Create screen: turns plain requests into song edits.
+ * Runs with no network. Anything it doesn't understand is marked `unknown` so the live AI
+ * (when the server has a key) can take over.
+ */
+
+export type PlayCommand = { type: 'play'; section?: number } | { type: 'stop' } | { type: 'loop'; section?: number }
+
+export interface SongReply {
+  text: string
+  edits: SongEdit[]
+  /** Moves through the version history instead of editing. */
+  history?: 'undo' | 'redo'
+  play?: PlayCommand
+  unknown: boolean
+  mood: Mood
+}
+
+const KIND_WORDS: [RegExp, SectionKind][] = [
+  [/\bintros?\b/, 'intro'],
+  [/\bverses?\b/, 'verse'],
+  [/\bbuild ?ups?\b|\bbuilds?\b|\briser\b/, 'build'],
+  [/\bchorus(es)?\b|\bhooks?\b|\brefrain\b/, 'chorus'],
+  [/\bdrops?\b/, 'drop'],
+  [/\bbridges?\b|\bmiddle 8\b/, 'bridge'],
+  [/\bbreakdowns?\b/, 'breakdown'],
+  [/\bbreaks?\b(?! it)/, 'break'],
+  [/\boutros?\b|\bending\b/, 'outro'],
+]
+
+const ORDINALS: Record<string, number> = { first: 1, '1st': 1, second: 2, '2nd': 2, third: 3, '3rd': 3, fourth: 4, '4th': 4, last: -1, final: -1 }
+
+/** "the chorus" → every chorus; "verse 2", "second verse", "last chorus" → one section. */
+export function findTarget(text: string, song: SongSpec | undefined): Target | undefined {
+  for (const [pattern, kind] of KIND_WORDS) {
+    const match = text.match(pattern)
+    if (!match) continue
+    const after = text.slice((match.index ?? 0) + match[0].length).match(/^\s*(\d)\b/)
+    const before = text.slice(0, match.index).match(/\b(first|1st|second|2nd|third|3rd|fourth|4th|last|final)\s*$/)
+    const number = after ? Number(after[1]) : before ? ORDINALS[before[1]] : undefined
+    if (number === undefined || !song) return { kind }
+    const indexes = song.sections.flatMap((section, index) => (section.kind === kind ? [index] : []))
+    const chosen = number === -1 ? indexes.at(-1) : indexes[number - 1]
+    return chosen === undefined ? { kind } : { section: chosen + 1 }
+  }
+  const position = text.match(/\b(?:section|part) (\d{1,2})\b/)
+  if (position) return { section: Number(position[1]) }
+  return undefined
+}
+
+const PART_WORDS: [RegExp, keyof SectionParts][] = [
+  [/\bdrums?\b|\bbeat\b|\bpercussion\b/, 'drums'],
+  [/\bbass(line)?\b/, 'bass'],
+  [/\bchords?\b|\bguitars?\b|\bpads?\b|\bkeys\b/, 'chords'],
+  [/\bmelody\b|\blead\b|\briff\b|\bhook line\b/, 'lead'],
+]
+
+function partsIn(text: string): (keyof SectionParts)[] {
+  return PART_WORDS.filter(([pattern]) => pattern.test(text)).map(([, part]) => part)
+}
+
+const wantsNewSong = (text: string) =>
+  /\b(make|create|write|generate|give|build|start|cook up|compose|produce|need|want)\b( me| us)? (a|an|some|another|new|one more)\b.*\b(song|track|beat|instrumental|tune|banger|jam)\b/.test(text)
+  || /\b(new|fresh|different) (song|track|instrumental)\b/.test(text)
+  || /^(a |an )?[a-z&' -]+ (song|track|instrumental)$/.test(text)
+
+function bpmInRange(genreId: string, text: string): number | undefined {
+  const tempo = findTempo(text)
+  if (tempo?.bpm) return tempo.bpm
+  const at = text.match(/\bat (\d{2,3})\b/)
+  if (at) return Number(at[1])
+  const genre = getGenre(genreId)
+  if (tempo?.delta) return genre.bpm.default + tempo.delta
+  return undefined
+}
+
+function capitalize(sentence: string) {
+  return sentence.charAt(0).toUpperCase() + sentence.slice(1)
+}
+
+export function respondSong(input: string, song: SongSpec | undefined): SongReply {
+  const text = normalize(input)
+  const reply = (body: string, extra: Partial<SongReply> = {}): SongReply => ({ text: body, edits: [], unknown: false, mood: 'ready', ...extra })
+
+  if (!text) return reply("Tell me what you want to hear and I'll write it.", { mood: 'confused' })
+  if (/^(hi|hey|hello|yo|sup|hola|what's up|whats up)\b/.test(text) && text.split(' ').length <= 4) {
+    return reply(song ? `Hey! "${song.title}" is loaded. Want it heavier, faster, or a whole new song?` : `Hey, I'm ${ASSISTANT_NAME}. What are we making: post punk, metal, punk, drum & bass or reggaeton?`)
+  }
+  if (/^(thanks|thank you|thx|ty|cheers|nice|awesome|sick|rad|love it|perfect)\b/.test(text)) return reply('🤘 Anytime. Keep it loud.')
+
+  if (/^(undo|go back|back|nah|revert|previous version|take that back)\b|\bundo (that|it)\b/.test(text)) return reply('Undone. Back to the version before.', { history: 'undo' })
+  if (/^redo\b/.test(text)) return reply('Redone.', { history: 'redo' })
+
+  const genreAsked = findGenre(text)
+  const target = findTarget(text, song)
+
+  // Brand-new song.
+  const surprise = /\b(surprise me|anything|whatever|random)\b/.test(text)
+  if (!song || wantsNewSong(text)) {
+    if (!song && !genreAsked && !surprise && !wantsNewSong(text)) {
+      return reply(`Let's make something. Pick a sound, like "make a metal song", "drum and bass track at 174" or "reggaeton beat in A minor", or say "surprise me".`, { unknown: true, mood: 'confused' })
+    }
+    const primary = GENRES.filter((genre) => genre.primary)
+    const genreId = genreAsked ?? (song && !surprise ? song.genreId : primary[Math.floor(Math.random() * primary.length)].id)
+    const key = findKey(text)
+    const edit: SongEdit = { type: 'new_song', genre: genreId, bpm: bpmInRange(genreId, text), root: key?.root, scale: key?.scale ?? darkScale(text) }
+    return reply(`🤘 Fresh ${getGenre(genreId).name} song coming up. Tell me what to change: "heavier chorus", "new drums", "faster", "add a bridge".`, { edits: [edit], play: { type: 'play' }, mood: 'rocking' })
+  }
+  if (!song) return reply('Say "make a metal song" (or any genre) and I\'ll write one.', { unknown: true, mood: 'confused' })
+
+  const edits: SongEdit[] = []
+  let play: PlayCommand | undefined
+  const said: string[] = []
+
+  // Playback.
+  if (/\b(stop|pause|silence|shut up|quiet down)\b/.test(text)) { play = { type: 'stop' }; said.push('stopped') }
+  else if (/\bloop\b/.test(text)) { play = { type: 'loop', section: target?.section ?? (target?.kind ? song.sections.findIndex((section) => section.kind === target.kind) + 1 : undefined) }; said.push('looping it') }
+  else if (/^(play|hit it|let's hear|lets hear|from the top|play it)\b/.test(text)) {
+    const section = target?.section ?? (target?.kind ? song.sections.findIndex((section) => section.kind === target.kind) + 1 : undefined)
+    play = { type: 'play', section }
+    said.push(section ? 'playing from there' : 'playing from the top')
+  }
+
+  if (genreAsked && genreAsked !== song.genreId && /\b(make it|turn it|switch|change|convert|as|into|more like)\b/.test(text)) {
+    edits.push({ type: 'change_genre', genre: genreAsked })
+  }
+
+  const feelWord = /\b(half|double)[ -]?time\b/.test(text)
+  const tempo = findTempo(text)
+  if (tempo && !(feelWord && tempo.bpm === undefined)) edits.push({ type: 'set_tempo', ...tempo })
+
+  const key = findKey(text)
+  if (key) edits.push({ type: 'set_key', ...key })
+
+  const tweak = findSynthTweak(text)
+  const heavy = /\b(heavier|harder|hit harder|more aggressive|more energy|bigger|louder|angrier|more intense|crazier|go off)\b/.test(text)
+  const soft = /\b(softer|calmer|chill(er)?|less busy|quieter|mellow(er)?|smoother|relax(ed)?|tone it down|less intense|emptier)\b/.test(text)
+  if (heavy) {
+    edits.push({ type: 'energy', direction: 'up', ...target })
+    if (/\bheavier|harder|aggressive|angrier\b/.test(text)) edits.push({ type: 'tone', tweak: 'heavier', part: 'chords' })
+  } else if (soft && !tempo) {
+    edits.push({ type: 'energy', direction: 'down', ...target })
+  }
+  if (tweak && !(heavy && tweak === 'heavier')) {
+    const parts = partsIn(text).filter((part) => part !== 'drums')
+    edits.push({ type: 'tone', tweak, part: parts.length === 1 ? (parts[0] as 'bass' | 'chords' | 'lead') : 'all' })
+  } else if (!key && !tweak) {
+    const scale = darkScale(text)
+    if (scale) edits.push({ type: 'set_key', scale })
+    else if (/\b(happier|brighter|uplifting|happy|major)\b/.test(text)) edits.push({ type: 'set_key', scale: 'major' })
+  }
+
+  if (/\bhalf[ -]?time\b/.test(text)) edits.push({ type: 'feel', feel: 'half', ...target })
+  else if (/\bdouble[ -]?time\b/.test(text)) edits.push({ type: 'feel', feel: 'double', ...target })
+  else if (/\bnormal (time|groove|feel)\b/.test(text)) edits.push({ type: 'feel', feel: 'normal', ...target })
+
+  const fresh = /\b(new|different|another|change( the)?|other|fresh|rewrite|redo|regenerate|swap)\b/
+  if (fresh.test(text) && !/\b(add|another) (a |an )?(intro|verse|chorus|bridge|breakdown|drop|build|break|outro)\b/.test(text)) {
+    if (/\b(drums?|beat|groove)\b/.test(text)) edits.push({ type: 'regenerate', what: 'drums', ...target })
+    if (/\b(chords?|progression|changes)\b/.test(text)) edits.push({ type: 'regenerate', what: 'progression', ...target })
+    if (/\b(melody|lead|riff|hook line)\b/.test(text)) edits.push({ type: 'regenerate', what: 'lead', ...target })
+    if (/\bbass ?(line)?\b/.test(text) && !/\bsound\b/.test(text)) edits.push({ type: 'regenerate', what: 'bass', ...target })
+  }
+  if (/\b(surprise me|remix|shake (it )?up|randomi[sz]e|mutate|switch it up)\b/.test(text)) edits.push({ type: 'regenerate', what: 'all', ...target })
+
+  // Arrangement.
+  const add = text.match(/\b(?:add|another|one more|extra|put in|insert)\b(?: an?| one more| another)? (intro|verse|chorus|bridge|breakdown|drop|build|break|outro)/)
+  if (add) edits.push({ type: 'add_section', kind: add[1] as SectionKind })
+  if (/\b(remove|delete|cut|drop|lose|get rid of|skip)\b/.test(text) && target?.section !== undefined && !partsIn(text).length) edits.push({ type: 'remove_section', section: target.section })
+  else if (/\b(remove|delete|cut|get rid of|skip)\b/.test(text) && target?.kind && !partsIn(text).length) {
+    const last = song.sections.map((section) => section.kind).lastIndexOf(target.kind)
+    if (last >= 0) edits.push({ type: 'remove_section', section: last + 1 })
+  }
+  if (target && /\b(longer|extend|double the length)\b/.test(text)) {
+    const first = song.sections.find((section, index) => (target.section ? index === target.section - 1 : section.kind === target.kind))
+    if (first) edits.push({ type: 'set_bars', bars: Math.min(32, first.bars * 2), ...target })
+  } else if (target && /\b(shorter|trim|half the length)\b/.test(text)) {
+    const first = song.sections.find((section, index) => (target.section ? index === target.section - 1 : section.kind === target.kind))
+    if (first) edits.push({ type: 'set_bars', bars: Math.max(1, Math.floor(first.bars / 2)), ...target })
+  }
+  if (/\b(add|put|throw in|more)\b.*\bfills?\b/.test(text)) edits.push({ type: 'set_fill', on: true, ...target })
+  else if (/\b(no|remove|without|kill)\b.*\bfills?\b/.test(text)) edits.push({ type: 'set_fill', on: false, ...target })
+
+  for (const part of partsIn(text)) {
+    if (edits.some((edit) => edit.type === 'regenerate' || edit.type === 'tone')) break
+    if (/\b(no|mute|kill|remove|without|turn off|lose|take out|drop the)\b/.test(text)) edits.push({ type: 'parts', part, on: false, ...target })
+    else if (/\b(bring back|unmute|bring in|add|turn on|with|put in)\b/.test(text) && !/\badd (a |an )?(fill|intro|verse|chorus|bridge|breakdown|drop|build|break|outro)\b/.test(text)) edits.push({ type: 'parts', part, on: true, ...target })
+  }
+
+  const rename = input.match(/\b(?:call it|name it|rename it(?: to)?|title it)\s+["“]?([^"”]{1,60})["”]?\s*$/i)
+  if (rename) edits.push({ type: 'set_title', title: rename[1].trim() })
+
+  if (edits.length || play) {
+    const lead = edits.some((edit) => edit.type === 'energy' && edit.direction === 'up') ? '🤘 ' : ''
+    if (!play && edits.length) play = { type: 'play', section: target?.section ?? (target?.kind ? song.sections.findIndex((section) => section.kind === target.kind) + 1 : undefined) }
+    return reply(`${lead}${capitalize(said.join(', ') || 'on it')}.`, { edits, play, mood: lead ? 'rocking' : 'ready' })
+  }
+
+  if (genreAsked) return reply(`Want me to turn "${song.title}" into ${getGenre(genreAsked).name}? Say "make it ${getGenre(genreAsked).name.toLowerCase()}", or "new ${getGenre(genreAsked).name.toLowerCase()} song" to start fresh.`)
+  if (/\b(what|which) (can|do) (you|i)\b|\bhelp\b|\bwhat can you do\b/.test(text)) return reply(HELP)
+  return reply(`Hmm, that one's not in my setlist yet. Try "heavier chorus", "new drums in the verse", "add a bridge", "half-time breakdown", "faster", "make it darker" or "undo".`, { unknown: true, mood: 'confused' })
+}
+
+function darkScale(text: string): ScaleName | undefined {
+  if (/\b(evil|sinister|scarier|creepier|demonic|haunted)\b/.test(text)) return 'phrygian'
+  if (/\b(darker|sadder|moodier|gloomier|dark)\b/.test(text) && !/\b(synth|sound|tone|guitar|keys|bass sound)\b/.test(text)) return 'minor'
+  return undefined
+}
+
+export const HELP = `I write whole songs and change them when you ask. Try:
+• "make a post punk song" or "drum and bass at 174 in F minor"
+• "heavier chorus", "chill the verse out", "half-time bridge"
+• "new drums", "new chords for the chorus", "new melody"
+• "add a breakdown", "cut the last chorus", "make the intro longer"
+• "faster", "key of D minor", "make it darker", "brighter synth"
+• "play the chorus", "loop the bridge", "stop", "undo"`
+
+/** Summary line used after edits, e.g. "Made every chorus heavier and set the tempo to 160 BPM." */
+export function describeOutcome(summaries: string[], errors: string[]): string {
+  const done = summaries.length ? `${capitalize(summaries.join(', '))}.` : ''
+  const failed = errors.length ? ` Couldn't do everything: ${errors.join('; ')}.` : ''
+  return (done + failed).trim()
+}
+
+export function genreButtons(): { id: string; label: string; prompt: string }[] {
+  return GENRES.filter((genre) => genre.primary).map((genre) => ({ id: genre.id, label: genre.name, prompt: `Make a ${genre.name.toLowerCase()} song` }))
+}

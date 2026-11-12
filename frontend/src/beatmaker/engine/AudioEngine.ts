@@ -8,12 +8,19 @@ import type { MixPart, SynthPart } from './types'
 
 export type { MixPart, SynthPart }
 
+/** Anything that decides what plays on each 16th note (the loop Conductor, or a whole-song player). */
+export interface Ticker<K extends Tick = Tick> {
+  tick(): K
+  reset(): void
+}
+
+type TickOf<T> = T extends Ticker<infer K> ? K : Tick
+
 /**
  * Everything that makes sound. Built on Tone.js (MIT): its Transport is the tempo clock,
  * and its synths and effects are the instruments. Musical decisions live in `Conductor`.
  */
-export class AudioEngine {
-  readonly conductor: Conductor
+export class AudioEngine<T extends Ticker = Conductor> {
   private readonly master = new Tone.Limiter(-1)
   private readonly masterVolume = new Tone.Volume(-2)
   private readonly recorder = new Tone.Recorder()
@@ -25,8 +32,7 @@ export class AudioEngine {
   private repeatId?: number
   private recording = false
 
-  private constructor(private readonly getSong: () => BandSong, patches: Record<SynthPart, SynthPatch>, private readonly onTick: (tick: Tick) => void) {
-    this.conductor = new Conductor(getSong)
+  private constructor(readonly conductor: T, patches: Record<SynthPart, SynthPatch>, private readonly onTick: (tick: TickOf<T>) => void) {
     this.masterVolume.chain(this.master, Tone.getDestination())
     this.master.connect(this.recorder)
     this.mixers = {
@@ -51,9 +57,14 @@ export class AudioEngine {
 
   /** Must be called from a click or key press: browsers only allow audio to start after a user gesture. */
   static async create(getSong: () => BandSong, patches: Record<SynthPart, SynthPatch>, kit: KitPatch, onTick: (tick: Tick) => void): Promise<AudioEngine> {
+    return AudioEngine.withTicker(new Conductor(getSong), patches, kit, onTick)
+  }
+
+  /** Same as `create`, but with any ticker, e.g. the song player that walks through sections. */
+  static async withTicker<T extends Ticker>(ticker: T, patches: Record<SynthPart, SynthPatch>, kit: KitPatch, onTick: (tick: TickOf<T>) => void): Promise<AudioEngine<T>> {
     await Tone.start()
     Tone.getContext().lookAhead = 0.05
-    const engine = new AudioEngine(getSong, patches, onTick)
+    const engine = new AudioEngine<T>(ticker, patches, onTick)
     engine.applyKit(kit)
     return engine
   }
@@ -88,7 +99,7 @@ export class AudioEngine {
   }
 
   private step(time: number) {
-    const tick = this.conductor.tick()
+    const tick = this.conductor.tick() as TickOf<T>
     const stepSeconds = Tone.Time('16n').toSeconds()
     for (const event of tick.events) {
       if (event.part === 'drums') this.bandKit.hit(event.voice, time, event.velocity)

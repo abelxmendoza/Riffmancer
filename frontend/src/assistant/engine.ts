@@ -15,8 +15,8 @@ export interface Reply {
   actions: BeatAction[]
   /** Changes for the Studio. */
   studioActions?: StudioAction[]
-import type { PlayerAction } from '../player/bus'
-import { THEMES } from '../player/themes'
+  /** Changes for the music Player. */
+  playerActions?: PlayerAction[]
   /** A page to open. */
   navigate?: Route
   /** True when the built-in brain didn't understand; the live model may take over. */
@@ -42,7 +42,7 @@ const GENRE_ALIASES: [RegExp, string][] = [
 
 const NOTE_LOOKUP: Record<string, number> = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }
 
-function normalize(text: string) {
+export function normalize(text: string) {
   return text.toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9#&'\s-]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
@@ -75,7 +75,7 @@ export function findTempo(text: string): { bpm?: number; delta?: number } | unde
   return undefined
 }
 
-function findSynthTweak(text: string): SynthTweak | undefined {
+export function findSynthTweak(text: string): SynthTweak | undefined {
   if (!/\b(synth|sound|lead|tone|guitar|keys)\b/.test(text)) return undefined
   if (/\b(darker|warmer|duller|muffled)\b/.test(text)) return 'darker'
   if (/\b(brighter|sharper|crisper)\b/.test(text)) return 'brighter'

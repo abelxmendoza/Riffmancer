@@ -1,4 +1,4 @@
-import { openAssistant } from '../assistant/bus'
+import { dispatchSongPrompt, openAssistant } from '../assistant/bus'
 import { GENRES } from '../beatmaker/genres'
 import { hrefFor } from '../lib/route'
 import { FretBot } from './assistant/FretBot'
@@ -37,7 +37,7 @@ export function Landing() {
               Riffmancer turns your MIDI keyboard into a full band. Pick a genre, press play, and jam: drums, bass and chords follow every key you hit, and nothing you play is ever out of key.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <a href={hrefFor('beats')} className="rounded-full bg-primary px-6 py-3 text-sm font-black uppercase tracking-wider text-background shadow-[0_0_30px_rgba(163,230,53,0.3)] hover:bg-secondary">Start making beats</a>
+              <a href={hrefFor('create')} className="rounded-full bg-primary px-6 py-3 text-sm font-black uppercase tracking-wider text-background shadow-[0_0_30px_rgba(163,230,53,0.3)] hover:bg-secondary">Make a song with Fret</a>
               <a href={hrefFor('studio')} className="rounded-full border border-primary/60 px-6 py-3 text-sm font-black uppercase tracking-wider text-primary hover:bg-primary hover:text-background">Record vocals</a>
               <a href="#genres" onClick={(event) => { event.preventDefault(); document.getElementById('genres')?.scrollIntoView({ behavior: 'smooth' }) }} className="rounded-full border border-foreground/15 px-6 py-3 text-sm font-black uppercase tracking-wider text-foreground/80 hover:border-secondary hover:text-foreground">See the genres</a>
             </div>
@@ -80,7 +80,7 @@ export function Landing() {
         <p className="mt-3 max-w-2xl text-2xl font-black text-foreground">Tuned for the loud stuff, with more on the way.</p>
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {GENRES.map((genre) => (
-            <a key={genre.id} href={hrefFor('beats')} onClick={() => { try { window.localStorage.setItem('riffmancer.beatmaker.pendingGenre', genre.id) } catch { /* storage blocked */ } }} className={`group rounded-3xl border p-5 transition hover:border-primary ${genre.primary ? 'border-foreground/15 bg-surface' : 'border-foreground/10 bg-background'}`}>
+            <a key={genre.id} href={hrefFor('create')} onClick={() => dispatchSongPrompt(`Make a ${genre.name.toLowerCase()} song`)} className={`group rounded-3xl border p-5 transition hover:border-primary ${genre.primary ? 'border-foreground/15 bg-surface' : 'border-foreground/10 bg-background'}`}>
               <div className="flex items-baseline justify-between gap-3">
                 <h3 className="font-display text-lg font-black uppercase text-foreground group-hover:text-primary">{genre.name}</h3>
                 <span className="font-mono text-xs text-foreground/40">{genre.bpm.default} BPM</span>
@@ -108,9 +108,9 @@ export function Landing() {
       <section className="rounded-[2rem] border border-primary/25 bg-primary/10 px-6 py-12 text-center">
         <img src="/riffmancer-emblem.webp" width={220} height={220} alt="" className="mx-auto mb-6 w-44 rounded-2xl sm:w-56" />
         <p className="font-display text-3xl font-black uppercase text-foreground">Plug in. Press play. Riff.</p>
-        <a href={hrefFor('beats')} className="mt-6 inline-block rounded-full bg-primary px-6 py-3 text-sm font-black uppercase tracking-wider text-background hover:bg-secondary">Open the Beat Maker</a>
+        <a href={hrefFor('create')} className="mt-6 inline-block rounded-full bg-primary px-6 py-3 text-sm font-black uppercase tracking-wider text-background hover:bg-secondary">Make a song</a>
         <p className="mt-6 text-sm text-foreground/60">Got an instrumental? <a className="font-bold text-primary underline" href={hrefFor('studio')}>Record your vocals over it in the Studio</a>, with genre vocal presets and WAV export.</p>
-        <p className="mt-3 text-xs text-foreground/45">Got a finished song instead? <a className="font-bold text-secondary underline" href={hrefFor('stems')}>Split it into stems in the Stem Lab.</a></p>
+        <p className="mt-6 text-xs text-foreground/45">Got a finished song instead? <a className="font-bold text-secondary underline" href={hrefFor('stems')}>Split it into stems in the Stem Lab.</a></p>
       </section>
 
       <footer className="flex items-center gap-3 border-t border-foreground/10 pt-6 text-xs text-foreground/35"><img src="/riffmancer-emblem.webp" width={40} height={40} alt="" className="h-10 w-10 rounded-lg" /><span>Riffmancer · Sound powered by Tone.js · Made for musicians who just want to play.</span></footer>

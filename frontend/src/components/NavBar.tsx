@@ -6,7 +6,8 @@ import { BrandMark } from './BrandMark'
 
 const LINKS: { route: Route; label: string }[] = [
   { route: 'home', label: 'Home' },
-  { route: 'beats', label: 'Beat Maker' },
+  { route: 'create', label: 'Create' },
+  { route: 'beats', label: 'Jam' },
   { route: 'studio', label: 'Studio' },
   { route: 'stems', label: 'Stem Lab' },
   { route: 'player', label: 'Player' },
@@ -48,8 +49,8 @@ export function NavBar({ route }: { route: Route }) {
             <FretBot size={26} />
             Ask Fret
           </button>
-          <a href={hrefFor('beats')} className="hidden rounded-full bg-primary px-4 py-2 text-xs font-black uppercase tracking-wider text-background hover:bg-secondary lg:inline-block">
-            Start jamming
+          <a href={hrefFor('create')} className="hidden rounded-full bg-primary px-4 py-2 text-xs font-black uppercase tracking-wider text-background hover:bg-secondary lg:inline-block">
+            Make a song
           </a>
         </div>
         <button
