@@ -2,8 +2,8 @@ import { useId } from 'react'
 import type { Mood } from '../../assistant/engine'
 
 const INK = '#0B1210'
-const GLOW = '#A3E635'
-const ACCENT = '#22C55E'
+const GLOW = 'var(--color-primary)'
+const ACCENT = 'var(--color-secondary)'
 const JOINT = '#1E2A25'
 const SPARK = '#FACC15'
 

@@ -1,6 +1,16 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
+/* Colour tokens. These are the Toxic defaults; src/theme/store.ts rewrites them on <html> for the
+   chosen theme, and every bg-primary, text-foreground/60... follows. */
+@theme {
+  --color-background: #080E0D;
+  --color-surface: #14201B;
+  --color-primary: #A3E635;
+  --color-secondary: #22C55E;
+  --color-foreground: #E5F7E7;
+}
+
 :root {
   color-scheme: dark;
   font-synthesis: none;
@@ -10,11 +20,41 @@
 /* Base rules sit in the base layer so Tailwind utilities (text-xs, font-bold...) can override them. */
 @layer base {
   * { box-sizing: border-box; }
-  body { margin: 0; min-width: 320px; min-height: 100vh; background: #080E0D; }
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background-color: var(--color-background);
+    /* A soft glow in the theme colour, top right, plus a faint one bottom left. */
+    background-image:
+      radial-gradient(1100px 520px at 85% -8%, color-mix(in oklab, var(--color-primary) 9%, transparent), transparent 70%),
+      radial-gradient(900px 500px at -10% 105%, color-mix(in oklab, var(--color-secondary) 6%, transparent), transparent 70%);
+    background-attachment: fixed;
+    transition: background-color .4s ease;
+  }
   button, input, textarea { font: inherit; }
 }
-button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid #A3E635; outline-offset: 3px; }
-::selection { background: #A3E635; color: #080E0D; }
+button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+::selection { background: var(--color-primary); color: var(--color-background); }
+
+/* The skull artwork is green; each theme recolours it. */
+.emblem { filter: var(--emblem-filter, none); transition: filter .4s ease; }
+
+/* Film grain over everything, very faint, for a printed-poster feel. Hidden for reduced motion is not needed: it doesn't move. */
+.grain::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: .05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Page change: the new screen rises in. */
+.page-enter { animation: page-in .35s ease-out both; }
+@keyframes page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .page-enter { animation: none; } }
 
 /* Fret the mascot. All motion lives here; .fb-still and reduced-motion turn it off. */
 .fretbot * { transform-box: fill-box; transform-origin: center; }

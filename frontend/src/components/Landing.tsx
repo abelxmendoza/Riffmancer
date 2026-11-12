@@ -43,7 +43,7 @@ export function Landing() {
             </div>
             <p className="mt-6 text-xs text-foreground/40">Free, runs in your browser. Best in Chrome or Edge for MIDI.</p>
           </div>
-          <img src="/riffmancer-emblem.webp" width={560} height={560} alt="Riffmancer skull emblem made of musical notation" className="order-first mx-auto w-full max-w-[560px] rounded-3xl lg:order-none shadow-[0_0_80px_rgba(163,230,53,0.18)]" />
+          <img src="/riffmancer-emblem.webp" width={560} height={560} alt="Riffmancer skull emblem made of musical notation" className="emblem order-first mx-auto w-full max-w-[560px] rounded-3xl lg:order-none shadow-[0_0_80px_color-mix(in_oklab,var(--color-primary)_18%,transparent)]" />
         </div>
       </section>
 
@@ -106,14 +106,14 @@ export function Landing() {
       </section>
 
       <section className="rounded-[2rem] border border-primary/25 bg-primary/10 px-6 py-12 text-center">
-        <img src="/riffmancer-emblem.webp" width={220} height={220} alt="" className="mx-auto mb-6 w-44 rounded-2xl sm:w-56" />
+        <img src="/riffmancer-emblem.webp" width={220} height={220} alt="" className="emblem mx-auto mb-6 w-44 rounded-2xl sm:w-56" />
         <p className="font-display text-3xl font-black uppercase text-foreground">Plug in. Press play. Riff.</p>
         <a href={hrefFor('create')} className="mt-6 inline-block rounded-full bg-primary px-6 py-3 text-sm font-black uppercase tracking-wider text-background hover:bg-secondary">Make a song</a>
         <p className="mt-6 text-sm text-foreground/60">Got an instrumental? <a className="font-bold text-primary underline" href={hrefFor('studio')}>Record your vocals over it in the Studio</a>, with genre vocal presets and WAV export.</p>
         <p className="mt-6 text-xs text-foreground/45">Got a finished song instead? <a className="font-bold text-secondary underline" href={hrefFor('stems')}>Split it into stems in the Stem Lab.</a></p>
       </section>
 
-      <footer className="flex items-center gap-3 border-t border-foreground/10 pt-6 text-xs text-foreground/35"><img src="/riffmancer-emblem.webp" width={40} height={40} alt="" className="h-10 w-10 rounded-lg" /><span>Riffmancer · Sound powered by Tone.js · Made for musicians who just want to play.</span></footer>
+      <footer className="flex items-center gap-3 border-t border-foreground/10 pt-6 text-xs text-foreground/35"><img src="/riffmancer-emblem.webp" width={40} height={40} alt="" className="emblem h-10 w-10 rounded-lg" /><span>Riffmancer · Sound powered by Tone.js · Made for musicians who just want to play.</span></footer>
     </div>
   )
 }

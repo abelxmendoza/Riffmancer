@@ -147,6 +147,22 @@ export class AudioEngine<T extends Ticker = Conductor> {
     this.liveKit.applyKit(kit)
   }
 
+  /** Resolves once every recorded instrument and kit set in use has loaded (or fallen back to synth). */
+  async loaded(): Promise<void> {
+    await Promise.all([...Object.values(this.channels), this.liveChords].map((channel) => channel.loaded()).concat(this.bandKit.loaded(), this.liveKit.loaded()))
+  }
+
+  /** Swaps one drum for a recorded hit (undefined: back to the synth drum). */
+  setDrumSample(voice: DrumVoice, buffer: AudioBuffer | undefined) {
+    this.bandKit.setSample(voice, buffer)
+    this.liveKit.setSample(voice, buffer)
+  }
+
+  /** Decodes compressed audio (an MP3 preview) with the engine's audio context. */
+  decode(bytes: ArrayBuffer): Promise<AudioBuffer> {
+    return Tone.getContext().rawContext.decodeAudioData(bytes.slice(0))
+  }
+
   /** Volume 0–1 per part; 0 mutes. */
   setLevel(part: MixPart, level: number) {
     const node = this.mixers[part]

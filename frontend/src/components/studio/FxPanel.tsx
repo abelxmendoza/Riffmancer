@@ -1,9 +1,11 @@
 import { GENRES } from '../../beatmaker/genres'
-import { DELAY_LABELS, getVocalPreset, MASTER_PRESETS, VOCAL_PRESETS, type DelayTime, type MasterChain, type VocalChain } from '../../studio/presets'
+import { allVocalPresets, DELAY_LABELS, getVocalPreset, MASTER_PRESETS, VOCAL_PRESETS, type DelayTime, type MasterChain, type VocalChain } from '../../studio/presets'
 import type { StudioProject, Track } from '../../studio/project'
+import type { VocalMatch } from '../../studio/analysis/vocalMatch'
 import { Panel, Slider, Toggle } from '../beatmaker/Slider'
+import { MatchPanel } from './MatchPanel'
 
-const genreName = (id: string) => (id === 'utility' ? 'Any genre' : GENRES.find((genre) => genre.id === id)?.name ?? id)
+const genreName = (id: string) => (id === 'mine' ? 'Your presets' : id === 'utility' ? 'Any genre' : GENRES.find((genre) => genre.id === id)?.name ?? id)
 const GROUPS = [...GENRES.map((genre) => genre.id), 'utility'].filter((id) => VOCAL_PRESETS.some((preset) => preset.genre === id))
 
 const db = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(1)} dB`
@@ -16,9 +18,9 @@ export function PresetSelect({ value, onChange, label = 'Vocal preset' }: { valu
       <span className="text-[11px] font-bold uppercase tracking-wider text-foreground/55">{label}</span>
       <select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-xl border border-foreground/15 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none">
         {value === 'custom' && <option value="custom">Custom (edited)</option>}
-        {GROUPS.map((group) => (
+        {[...GROUPS, ...(allVocalPresets().some((preset) => preset.genre === 'mine') ? ['mine'] : [])].map((group) => (
           <optgroup key={group} label={genreName(group)}>
-            {VOCAL_PRESETS.filter((preset) => preset.genre === group).map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
+            {allVocalPresets().filter((preset) => preset.genre === group).map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
           </optgroup>
         ))}
       </select>
@@ -36,7 +38,14 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 }
 
 /** The selected vocal track's effects chain. */
-export function FxPanel({ track, onPreset, onChange }: { track: Track; onPreset: (id: string) => void; onChange: (changes: Partial<VocalChain>) => void }) {
+export function FxPanel({ track, onPreset, onChange, matching = false, onMatching, onMatchSave }: {
+  track: Track
+  onPreset: (id: string) => void
+  onChange: (changes: Partial<VocalChain>) => void
+  matching?: boolean
+  onMatching?: (open: boolean) => void
+  onMatchSave?: (name: string, match: VocalMatch) => void
+}) {
   const chain = track.chain
   if (!chain) {
     return (
@@ -58,6 +67,9 @@ export function FxPanel({ track, onPreset, onChange }: { track: Track; onPreset:
             </div>
           )}
           {!preset && <p className="text-xs text-foreground/45">You've tweaked this chain. Pick a preset to start over.</p>}
+          {onMatching && onMatchSave && (matching
+            ? <MatchPanel onClose={() => onMatching(false)} onSave={(name, match) => { onMatchSave(name, match); onMatching(false) }} />
+            : <button type="button" onClick={() => onMatching(true)} className="w-full rounded-2xl border border-dashed border-secondary/50 px-3 py-2 text-left text-xs font-bold text-secondary hover:border-secondary hover:bg-secondary/10">🎯 Copy the vocal sound from a song you like</button>)}
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <Group title="Clean up">

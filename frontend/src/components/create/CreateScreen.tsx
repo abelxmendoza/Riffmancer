@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { OPEN_ASSISTANT_EVENT, publishBeatStatus, registerSongPromptHandler } from '../../assistant/bus'
+import { dispatchStudio, OPEN_ASSISTANT_EVENT, publishBeatStatus, registerSongPromptHandler, type StudioAction } from '../../assistant/bus'
 import type { Mood } from '../../assistant/engine'
 import { askSongLive, probeSongLive } from '../../assistant/liveSong'
 import type { LiveState } from '../../assistant/live'
 import { ASSISTANT_NAME } from '../../assistant/persona'
-import { describeOutcome, genreButtons, respondSong, type PlayCommand } from '../../assistant/songBrain'
+import { describeOutcome, genreButtons, respondSong, vocalPresetForSong, type PlayCommand, type SongReply } from '../../assistant/songBrain'
+import type { DrumVoice } from '../../beatmaker/genres/types'
+import { sampleLabel, type SampleRef } from '../../song/samples'
+import { SamplesUnavailable, searchSamples } from '../../services/freesound'
+import { sendToStudio } from '../../studio/storage'
 import { applyEdits, type SongEdit } from '../../song/edit'
 import { generateSong } from '../../song/generate'
 import { commit, currentVersion, goTo, loadHistory, redo, saveHistory, undo, type SongHistory } from '../../song/history'
 import { sectionName, type SongSpec } from '../../song/spec'
+import { applyThemeRequest, followGenre } from '../../theme/store'
 import { FretBot } from '../assistant/FretBot'
 import { SongCard } from './SongCard'
 import { UnderTheHood } from './UnderTheHood'
@@ -33,7 +38,14 @@ function loadMessages(): ChatMessage[] {
   }
 }
 
-const QUICK_ASKS = ['Heavier', 'Darker', 'Faster', 'New drums', 'Another chorus', 'Half-time breakdown', 'Surprise me']
+const DESCRIBE_IDEAS = [
+  'Shoegaze song with fuzzy wide guitars and a deep sub bass',
+  'Dark trap beat with a gliding 808 and glassy bells',
+  'Synthwave song at 110 with lush pads and roomy drums',
+  'Doom song with huge fuzz guitars',
+]
+
+const QUICK_ASKS = ['Something totally different', 'Heavier', 'Faster', 'Live acoustic drums', 'Distorted guitars', 'Picked bass guitar', 'Make the lead a sax', 'Piano chords', 'Deep 808 bass', 'Real recorded drums', 'Another chorus', 'What instruments do you have?']
 
 /** The main screen: talk to Fret, Fret writes and edits the song. Manual controls live under the hood. */
 export function CreateScreen() {
@@ -54,6 +66,7 @@ export function CreateScreen() {
   const player = useSongPlayer(song)
 
   useEffect(() => { saveHistory(history) }, [history])
+  useEffect(() => { followGenre(song?.genreId) }, [song?.genreId])
   useEffect(() => {
     try { window.localStorage.setItem(MESSAGES_KEY, JSON.stringify(messages.filter((message) => !message.pending).slice(-40))) } catch { /* storage blocked */ }
   }, [messages])
@@ -87,8 +100,70 @@ export function CreateScreen() {
     if (command.type === 'stop') { player.stop(); return }
     const index = command.section ? command.section - 1 : 0
     if (command.type === 'loop') { player.setLoopSection(index); setSelected(index) } else if (command.section) setSelected(index)
-    void player.play(index)
+    void player.play(index, current)
   }, [player])
+
+  /** Records the song once in real time, hands it to the Studio with a fitting vocal preset, and opens the Studio. */
+  const singOver = useCallback(async (current: SongSpec, actions?: StudioAction[]) => {
+    const vocal = actions ?? [{ type: 'genre', id: current.genreId }, { type: 'tempo', bpm: current.bpm }, vocalPresetForSong(current).action] satisfies StudioAction[]
+    try {
+      const blob = await player.bounce()
+      await sendToStudio(`${current.title} (instrumental)`, blob)
+      for (const action of vocal) dispatchStudio(action)
+      window.location.hash = '#/studio'
+    } catch (reason) {
+      addBot(`Didn't make it to the Studio: ${reason instanceof Error ? reason.message : 'recording failed'}`)
+      setFlash('confused')
+    }
+  }, [player]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Search results per drum, so "another snare" moves to the next one instead of searching again. */
+  const sampleCursor = useRef(new Map<DrumVoice, { description: string; results: SampleRef[]; index: number; page: number; more: boolean }>())
+
+  /** Finds real hits on Freesound for each drum and puts the best match in. */
+  const findSamples = useCallback(async (request: NonNullable<SongReply['samples']>, base: SongSpec) => {
+    const pendingId = nextId.current++
+    setMessages((current) => [...current, { id: pendingId, from: 'bot', text: `🔎 Digging through Freesound for ${request.voices.map(sampleLabel).join(', ')}…`, pending: true }])
+    setBusy(true)
+    const edits: SongEdit[] = []
+    const misses: string[] = []
+    let problem: string | undefined
+    try {
+      for (const voice of request.voices) {
+        const previous = sampleCursor.current.get(voice)
+        let cursor = request.next && previous ? { ...previous, index: previous.index + 1 } : { description: request.description, results: [] as SampleRef[], index: 0, page: 0, more: true }
+        if (cursor.index >= cursor.results.length) {
+          if (!cursor.more) cursor = { ...cursor, index: 0 }
+          else {
+            const found = await searchSamples(voice, cursor.description, cursor.page + 1)
+            cursor = { ...cursor, results: [...cursor.results, ...found.results], page: cursor.page + 1, more: found.more }
+          }
+        }
+        // Skip the one already in the song when asking for another.
+        if (cursor.results[cursor.index]?.id === base.samples?.[voice]?.id && cursor.index + 1 < cursor.results.length) cursor.index += 1
+        sampleCursor.current.set(voice, cursor)
+        const pick = cursor.results[cursor.index]
+        if (pick) edits.push({ type: 'set_sample', voice, sample: pick })
+        else misses.push(sampleLabel(voice))
+      }
+    } catch (reason) {
+      problem = reason instanceof Error ? reason.message : 'Sample search failed.'
+      // No Freesound here: the bundled recorded kit still gives real drums.
+      if (reason instanceof SamplesUnavailable && !edits.length && base.kit.set !== 'acoustic') {
+        edits.push({ type: 'set_instrument', part: 'drums', instrument: 'acoustic' })
+        problem = `${problem} So I put the built-in recorded acoustic kit on for now.`
+      }
+    }
+    const result = runEdits(edits, base)
+    const credit = edits.some((edit) => edit.type === 'set_sample' && edit.sample?.license === 'CC BY') ? ' CC BY sounds need a credit if you release the song; the credits are on the song card.' : ''
+    const miss = misses.length ? ` Found nothing for "${[request.description, misses.join(', ')].filter(Boolean).join(' ')}", try other words.` : ''
+    const freesound = edits.some((edit) => edit.type === 'set_sample')
+    const body = [problem ?? '', freesound ? `${result.text}${credit} Say "another ${sampleLabel(request.voices[0]).split(' ').pop()}" to hear the next one, or "back to synth drums".` : '', miss].filter(Boolean).join(' ').trim()
+    setMessages((current) => current.map((message) => (message.id === pendingId ? { id: pendingId, from: 'bot', text: body || 'No samples found.' } : message)))
+    setFlash(edits.length ? 'ready' : 'confused')
+    setBusy(false)
+    if (edits.length && result.song && !player.playing) runPlay({ type: 'play' }, result.song)
+  }, [player.playing, runEdits, runPlay])
 
   const send = useCallback(async (raw: string) => {
     const text = raw.trim()
@@ -120,6 +195,28 @@ export function CreateScreen() {
       return
     }
 
+    if (reply.studio || reply.sendToStudio) {
+      addBot(reply.text)
+      setFlash(reply.mood)
+      if (reply.sendToStudio && base) void singOver(base, reply.studio)
+      else {
+        reply.studio?.filter((action) => action.type === 'customPreset' || action.type === 'matchReference').forEach(dispatchStudio)
+        if (reply.studio?.some((action) => action.type === 'matchReference')) window.location.hash = '#/studio'
+      }
+      return
+    }
+
+    if (reply.samples && base) {
+      await findSamples(reply.samples, base)
+      return
+    }
+
+    if (reply.theme) {
+      applyThemeRequest(reply.theme)
+      addBot(reply.text)
+      return
+    }
+
     if (reply.history) {
       setHistory((current) => (reply.history === 'undo' ? undo(current) : redo(current)))
       addBot(reply.text)
@@ -127,12 +224,12 @@ export function CreateScreen() {
     }
     const result = runEdits(reply.edits, base)
     const isNew = reply.edits.some((edit) => edit.type === 'new_song')
-    const body = isNew && result.song ? `${reply.text.replace(/song coming up\./, `song: "${result.song.title}".`)}` : result.text || reply.text
+    const body = isNew && result.song ? `${reply.text.replace(/song coming up(.*?)\./, `song$1: "${result.song.title}".`)}` : result.text || reply.text
     addBot(body)
     setFlash(reply.mood)
     if (isNew) { player.setLoopSection(undefined); setSelected(undefined) }
     runPlay(reply.play, result.song ?? base)
-  }, [busy, live, messages, player, runEdits, runPlay])
+  }, [busy, live, messages, player, runEdits, runPlay, singOver, findSamples])
 
   const sendRef = useRef(send)
   sendRef.current = send
@@ -178,6 +275,19 @@ export function CreateScreen() {
             onRedo={() => setHistory(redo)}
             onVersion={(index) => setHistory((current) => goTo(current, index))}
             onToggleDrawer={() => setDrawerOpen((open) => !open)}
+            onNext={() => {
+              const result = runEdits([{ type: 'next_song' }], song)
+              if (result.song && result.song !== song) {
+                player.setLoopSection(undefined)
+                setSelected(undefined)
+                addBot(`⏭ ${result.text}`)
+                runPlay({ type: 'play' }, result.song)
+              } else if (result.text) addBot(result.text)
+            }}
+            loadingSounds={player.loadingSounds}
+            onRemoveSample={(voice) => handEdit({ type: 'set_sample', voice }, `synth ${sampleLabel(voice)} back`)}
+            bouncing={player.bouncing}
+            onSingOver={() => { if (player.bouncing) player.stop(); else { addBot(`🎤 Recording "${song.title}" into the Studio. It plays through once, then the Studio opens with a vocal preset that fits.`); void singOver(song) } }}
           />
           {player.error && <p role="alert" className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{player.error}</p>}
         </>
@@ -191,6 +301,12 @@ export function CreateScreen() {
               <button key={genre.id} type="button" onClick={() => void send(genre.prompt)} className="rounded-full border border-primary/40 px-4 py-2 text-sm font-black text-foreground hover:bg-primary hover:text-background">{genre.label}</button>
             ))}
             <button type="button" onClick={() => void send('Surprise me')} className="rounded-full border border-foreground/15 px-4 py-2 text-sm font-black text-foreground/70 hover:border-secondary hover:text-foreground">Surprise me</button>
+          </div>
+          <p className="mt-6 text-xs font-bold uppercase tracking-wider text-foreground/40">Or describe it in your own words</p>
+          <div className="mt-2 flex max-w-xl flex-wrap justify-center gap-2">
+            {DESCRIBE_IDEAS.map((idea) => (
+              <button key={idea} type="button" onClick={() => void send(idea)} className="rounded-2xl border border-foreground/10 px-3 py-2 text-left text-xs text-foreground/70 hover:border-primary hover:text-foreground">“{idea}”</button>
+            ))}
           </div>
         </section>
       )}

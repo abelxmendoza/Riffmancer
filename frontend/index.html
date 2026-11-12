@@ -12,6 +12,12 @@
     <title>Riffmancer</title>
   </head>
   <body>
+    <!-- Recolours the green skull artwork for the Blood Moon theme (see src/theme/themes.ts). -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+      <filter id="emblem-blood" color-interpolation-filters="sRGB">
+        <feColorMatrix type="matrix" values="0.45 1.25 0.2 0 0  0.02 0.22 0.02 0 0  0.02 0.2 0.04 0 0  0 0 0 1 0" />
+      </filter>
+    </svg>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

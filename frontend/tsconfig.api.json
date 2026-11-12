@@ -9,5 +9,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["api", "src/assistant/persona.ts"]
+  "include": ["api", "src/assistant/persona.ts", "src/song/samples.ts", "src/beatmaker/genres/types.ts"]
 }

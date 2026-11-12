@@ -1,5 +1,6 @@
 import { getGenre } from '../beatmaker/genres'
-import { getVocalPreset, presetsForGenre } from '../studio/presets'
+import { defaultPresetFor, getVocalPreset, presetsForGenre } from '../studio/presets'
+import { describeVocal, vocalName } from '../studio/vocalSound'
 import type { StudioAction } from './bus'
 import { findGenre, findTempo, type EngineContext, type Reply } from './engine'
 
@@ -41,6 +42,28 @@ const ROLE_WORDS: [RegExp, Extract<StudioAction, { type: 'addTrack' }>['role']][
   [/\bfx\b|\beffects?\b/, 'fx'],
 ]
 
+/**
+ * "make my vocals dreamy with lots of reverb" → a new vocal preset built from those words, on top
+ * of the genre's usual lead sound. Returns nothing when no sound words were understood.
+ */
+export function describedVocalAction(text: string, genre: string): { action: Extract<StudioAction, { type: 'customPreset' }>; text: string } | undefined {
+  const described = describeVocal(text, defaultPresetFor(genre).chain)
+  if (!described.words.length) {
+    return undefined
+  }
+  const name = vocalName(described.words)
+  const missing = described.missing.length ? ` The Studio can't do ${described.missing.join(' or ')} yet, so I left that out.` : ''
+  return {
+    action: { type: 'customPreset', name, chain: described.chain, description: `Made from: "${text.slice(0, 80)}"` },
+    text: `Made a "${name}" preset (${described.words.join(', ')}) and saved it under Your presets.${missing} Every knob stays editable.`,
+  }
+}
+
+/** "copy the vocal effects from a song I like", "match the singer's voice on this track". */
+export const COPY_VOCAL = /\b(copy|match|steal|clone|grab|same|recreate|reuse|use)\b.*\b(vocals?|voice|singer|singing)\b.*\b(song|track|record|tune|radio|singer|artist|effects?|sound)\b|\b(vocals?|voice|singer)\b.*\b(like|from) (a|this|that|the|my|some) (song|track|record|tune)\b/
+
+const SAVE_PRESET = /\bsave (this|it|that|the (current )?(sound|chain|effects?)) as (a |my )?(new )?preset(?: called| named)?\s*["“]?([^"”]*)["”]?$/
+
 const isQuestion = (text: string) => /\?$|^(how|what|why|where|when|can|does|do|is|which|who)\b/.test(text)
 
 /** Studio part of Fret's built-in brain. Returns nothing when the message isn't about the Studio. */
@@ -55,6 +78,26 @@ export function respondStudio(text: string, context: EngineContext): StudioReply
     return { text: 'Vocals happen in the Studio. Opening it now: import your instrumental, put on headphones and hit Record.', navigate: 'studio' }
   }
   if (!onStudio && !aboutStudio) return undefined
+
+  if (COPY_VOCAL.test(text) && !isQuestion(text.replace(/^can you /, ''))) {
+    return {
+      text: `Let's copy it. Upload the song or play it near your mic${onStudio ? '' : ' in the Studio'}, and I'll estimate the reverb, echo, tone, grit and width on the voice and save it as a preset for yours. It's an estimate, so tweak to taste.`,
+      studioActions: [{ type: 'matchReference' }],
+      navigate: onStudio ? undefined : 'studio',
+      mood: 'ready',
+    }
+  }
+
+  // Described vocal sounds work from any page: the preset waits for the Studio to open.
+  if (!isQuestion(text) && /\b(vocals?|voice|preset|singing)\b/.test(text) && !PRESET_WORDS.some(([pattern]) => pattern.test(text))) {
+    const described = describedVocalAction(text, context.studio?.genre ?? 'post-punk')
+    if (described) return { text: described.text, studioActions: [described.action], navigate: onStudio ? undefined : 'studio', mood: 'ready' }
+  }
+  const save = text.match(SAVE_PRESET)
+  if (save && onStudio) {
+    const name = (save[6]?.trim() || 'my vocal').replace(/\b[a-z]/g, (letter) => letter.toUpperCase())
+    return { text: `Saved the selected track's effects as "${name}" under Your presets.`, studioActions: [{ type: 'savePreset', name }] }
+  }
 
   if (isQuestion(text)) {
     for (const [pattern, answer] of ANSWERS) {

@@ -1,0 +1,11 @@
+Drum samples bundled with Riffmancer
+
+acoustic/  Versilian Community Sample Library (VCSL) by Sam Gossner and contributors.
+           License: CC0 1.0 (public domain). Source: https://github.com/sgossner/VCSL
+           (files taken from the mp3/m4a mirror at https://github.com/danigb/samples)
+
+tr808/     Roland TR-808 sample set 1.0.0 by Michael Fischer (Technopolis, 1994),
+           released by the author as free samples. Source: https://github.com/danigb/samples
+           (audio/drum-machines/TR-808, which includes the original TR808.TXT)
+
+All files were trimmed, made mono and level-matched for the browser.

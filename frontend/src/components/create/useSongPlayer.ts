@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AudioEngine } from '../../beatmaker/engine/AudioEngine'
 import type { MixPart, SynthPart } from '../../beatmaker/engine/types'
-import type { DrumVoice } from '../../beatmaker/genres'
+import { DRUM_VOICES, type DrumVoice } from '../../beatmaker/genres/types'
+import { validSample } from '../../song/samples'
+import { sampleBytes } from '../../services/freesound'
 import type { SongConductor, SongTick } from '../../song/player'
 import type { SongSpec } from '../../song/spec'
 
@@ -23,6 +25,21 @@ export function useSongPlayer(song: SongSpec | undefined) {
   const [position, setPosition] = useState<Position>()
   const [loopSection, setLoopSectionState] = useState<number>()
   const loopRef = useRef<number | undefined>(undefined)
+  /** Set while the song is being recorded start to finish (for "Send to Studio"). */
+  const bounceRef = useRef<{ resolve: (blob: Blob) => void; reject: (reason: unknown) => void } | undefined>(undefined)
+  const [bouncing, setBouncing] = useState(false)
+  /** True while recorded instruments download before the first note. */
+  const [loadingSounds, setLoadingSounds] = useState(false)
+
+  /** Waits (up to a few seconds) for recorded instruments, so a song never starts on the synth stand-ins. */
+  const soundsReady = useCallback(async (engine: AudioEngine<SongConductor>) => {
+    setLoadingSounds(true)
+    try {
+      await Promise.race([engine.loaded(), new Promise((resolve) => window.setTimeout(resolve, 8000))])
+    } finally {
+      setLoadingSounds(false)
+    }
+  }, [])
 
   const ensureEngine = useCallback(async () => {
     if (engineRef.current) return engineRef.current
@@ -40,6 +57,12 @@ export function useSongPlayer(song: SongSpec | undefined) {
             engine.stop()
             setPlaying(false)
             setPosition(undefined)
+            const bounce = bounceRef.current
+            if (bounce) {
+              bounceRef.current = undefined
+              // Let reverb and delay tails ring out before the recording stops.
+              window.setTimeout(() => { void engine.stopRecording().then(bounce.resolve, bounce.reject).finally(() => setBouncing(false)) }, 1500)
+            }
           }
         })
         engineRef.current = engine
@@ -66,11 +89,34 @@ export function useSongPlayer(song: SongSpec | undefined) {
     for (const [part, level] of Object.entries(song.levels)) engine.setLevel(part as MixPart, level)
   }, [song, ready])
 
-  const play = useCallback(async (sectionIndex = 0) => {
+  // Real recorded drum hits: download and decode each one once, and swap them in.
+  const loadedSamples = useRef(new Map<DrumVoice, string>())
+  const [sampleError, setSampleError] = useState<string>()
+  useEffect(() => {
+    const engine = engineRef.current
+    if (!engine || !song) return
+    const loaded = loadedSamples.current
+    for (const voice of DRUM_VOICES) {
+      const url = validSample(song.samples?.[voice])?.url
+      if (loaded.get(voice) === url) continue
+      if (!url) { engine.setDrumSample(voice, undefined); loaded.delete(voice); continue }
+      loaded.set(voice, url)
+      sampleBytes(url)
+        .then((bytes) => engine.decode(bytes))
+        .then((buffer) => { if (loaded.get(voice) === url) engine.setDrumSample(voice, buffer) })
+        .catch(() => { loaded.delete(voice); setSampleError(`Couldn't load the ${voice} sample, so the synth one plays instead.`) })
+    }
+  }, [song, ready])
+
+  /** `song` is the version to play when it was made this instant (Next, a new song) and React hasn't re-rendered yet. */
+  const play = useCallback(async (sectionIndex = 0, song?: SongSpec) => {
     try {
       const engine = await ensureEngine()
-      const current = songRef.current
+      const current = song ?? songRef.current
       if (!current) return
+      engine.applyKit(current.kit)
+      for (const part of ['bass', 'chords', 'lead'] as SynthPart[]) engine.applyPatch(part, current.sounds[part])
+      await soundsReady(engine)
       engine.setTempo(current.bpm, current.swing)
       if (engine.playing) engine.stop()
       engine.conductor.startAt(sectionIndex)
@@ -79,12 +125,18 @@ export function useSongPlayer(song: SongSpec | undefined) {
     } catch {
       // ensureEngine already reported the error.
     }
-  }, [ensureEngine])
+  }, [ensureEngine, soundsReady])
 
   const stop = useCallback(() => {
-    engineRef.current?.stop()
+    const pending = bounceRef.current
+    bounceRef.current = undefined
+    const engine = engineRef.current
+    if (pending && engine?.isRecording) void engine.stopRecording().catch(() => undefined)
+    engine?.stop()
     setPlaying(false)
     setPosition(undefined)
+    setBouncing(false)
+    pending?.reject(new Error('Stopped before the end of the song.'))
   }, [])
 
   const setLoopSection = useCallback((index: number | undefined) => {
@@ -93,9 +145,30 @@ export function useSongPlayer(song: SongSpec | undefined) {
     if (engineRef.current) engineRef.current.conductor.loopSection = index
   }, [])
 
+  /** Plays the whole song once in real time while recording it, and returns the audio. */
+  const bounce = useCallback(async (): Promise<Blob> => {
+    const engine = await ensureEngine()
+    const current = songRef.current
+    if (!current) throw new Error('No song to record yet.')
+    if (bounceRef.current) throw new Error('Already recording the song.')
+    engine.stop()
+    loopRef.current = undefined
+    setLoopSectionState(undefined)
+    engine.conductor.loopSection = undefined
+    await soundsReady(engine)
+    engine.setTempo(current.bpm, current.swing)
+    await engine.startRecording()
+    setBouncing(true)
+    const done = new Promise<Blob>((resolve, reject) => { bounceRef.current = { resolve, reject } })
+    engine.conductor.startAt(0)
+    engine.play()
+    setPlaying(true)
+    return done
+  }, [ensureEngine, soundsReady])
+
   const audition = useCallback(async (voice: DrumVoice) => {
     try { (await ensureEngine()).hitDrum(voice, 0.9) } catch { /* reported */ }
   }, [ensureEngine])
 
-  return { ready, error, playing, position, loopSection, play, stop, setLoopSection, audition }
+  return { ready, loadingSounds, error: error ?? sampleError, playing, position, loopSection, bouncing, play, stop, setLoopSection, audition, bounce }
 }

@@ -1,6 +1,7 @@
 import type { MixPart, SynthPart } from '../beatmaker/engine/types'
 import { DRUM_VOICES, type DrumPatternText, type KitPatch, type SynthPatch } from '../beatmaker/genres'
 import { SCALES, type ScaleName } from '../beatmaker/theory'
+import type { SongSamples } from './samples'
 
 /**
  * A whole song as plain data. Fret writes and edits it, the player reads it, and it is saved
@@ -61,6 +62,8 @@ export interface SongSpec {
   version: 1
   title: string
   genreId: string
+  /** The style the person asked for ("Shoegaze"), when it is more specific than the genre engine. */
+  style?: string
   bpm: number
   swing: number
   root: number
@@ -68,6 +71,8 @@ export interface SongSpec {
   sections: Section[]
   sounds: Record<SynthPart, SynthPatch>
   kit: KitPatch
+  /** Real recorded drum hits (from Freesound) that replace synthesized drums. */
+  samples?: SongSamples
   levels: Record<MixPart, number>
   /** Seed for the next random choice, so "surprise me" is repeatable in tests. */
   seed: number

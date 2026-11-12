@@ -1,5 +1,7 @@
-import { getGenre } from '../../beatmaker/genres'
+import { DRUM_VOICES, getGenre, type DrumVoice } from '../../beatmaker/genres'
+import { commercialOk, creditLine, sampleLabel, validSample, type SampleRef } from '../../song/samples'
 import { NOTE_NAMES, SCALE_LABELS } from '../../beatmaker/theory'
+import { DRUM_SETS } from '../../song/instruments'
 import type { SongHistory } from '../../song/history'
 import { formatDuration, sectionName, type SectionKind, type SongSpec } from '../../song/spec'
 import { PauseIcon, PlayIcon } from '../Icons'
@@ -44,6 +46,21 @@ interface SongCardProps {
   onRedo: () => void
   onVersion: (index: number) => void
   onToggleDrawer: () => void
+  /** A totally different song in the same genre or style. */
+  onNext: () => void
+  /** Recorded instruments are still downloading. */
+  loadingSounds?: boolean
+  /** Takes a real drum sample off, back to the synth drum. */
+  onRemoveSample?: (voice: DrumVoice) => void
+  bouncing: boolean
+  onSingOver: () => void
+}
+
+/** "Picked bass · Distorted guitar · Guitar solo · Acoustic kit": who's playing, recorded or synth. */
+function bandLine(song: SongSpec): string {
+  const parts = (['bass', 'chords', 'lead'] as const).map((part) => song.sounds[part].name.replace(/ \(edited\)$/, ''))
+  const kit = DRUM_SETS.find((set) => set.id === song.kit.set)?.name ?? 'Synth drums'
+  return [...parts, kit].join(' · ')
 }
 
 /** The one thing on screen besides Fret: the song, its parts, and its versions. */
@@ -51,6 +68,8 @@ export function SongCard(props: SongCardProps) {
   const { song, history, playing, position, selected, loopSection } = props
   const genre = getGenre(song.genreId)
   const key = `${NOTE_NAMES[song.root]} ${SCALE_LABELS[song.scale].split(' ')[0].toLowerCase()}`
+  const samples = DRUM_VOICES.flatMap((voice) => { const sample = validSample(song.samples?.[voice]); return sample ? [[voice, sample] as [DrumVoice, SampleRef]] : [] })
+  const band = bandLine(song)
   const selectedIndex = selected !== undefined && selected < song.sections.length ? selected : undefined
   return (
     <section aria-label="Your song" className="rounded-3xl border border-foreground/10 bg-surface p-4 sm:p-5">
@@ -65,8 +84,18 @@ export function SongCard(props: SongCardProps) {
         </button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-display text-2xl font-black text-foreground sm:text-3xl">{song.title}</h1>
-          <p className="mt-0.5 truncate text-xs font-bold text-foreground/50">{genre.name} · {song.bpm} BPM · {key} · {formatDuration(song)}</p>
+          <p className="mt-0.5 truncate text-xs font-bold text-foreground/50">{song.style ?? genre.name} · {song.bpm} BPM · {key} · {formatDuration(song)}</p>
+          <p className="mt-1 truncate text-[11px] text-foreground/45" title={band}>{props.loadingSounds ? 'Loading the instruments…' : band}</p>
         </div>
+        <button
+          type="button"
+          onClick={props.onNext}
+          title={`Don't like it? Get a totally different ${song.style ?? genre.name} song`}
+          className="flex shrink-0 flex-col items-center rounded-2xl border border-primary/50 px-3 py-2 text-primary hover:bg-primary hover:text-background"
+        >
+          <span className="text-lg font-black leading-none" aria-hidden="true">⏭</span>
+          <span className="mt-0.5 text-[11px] font-black uppercase tracking-wider">Next</span>
+        </button>
       </div>
 
       <div className="mt-4 flex gap-1" role="group" aria-label="Song parts">
@@ -103,6 +132,24 @@ export function SongCard(props: SongCardProps) {
         </div>
       )}
 
+      {samples.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-foreground/10 bg-background/40 px-3 py-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/50">Real drums · from Freesound</p>
+          <ul className="mt-1 space-y-1">
+            {samples.map(([voice, sample]) => (
+              <li key={voice} className="flex items-center gap-2 text-xs">
+                <span className="w-20 shrink-0 font-bold capitalize text-foreground/80">{sampleLabel(voice)}</span>
+                <a href={sample.page} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-foreground/65 underline decoration-foreground/20 underline-offset-2 hover:text-foreground" title={creditLine(sample)}>
+                  "{sample.name}" by {sample.author}
+                </a>
+                <span title={commercialOk(sample.license) ? (sample.license === 'CC0' ? 'Free to use, no credit needed' : 'Free to use with credit to the author') : 'Not for commercial releases'} className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${sample.license === 'CC0' ? 'bg-primary/15 text-primary' : commercialOk(sample.license) ? 'bg-foreground/10 text-foreground/70' : 'bg-red-500/15 text-red-300'}`}>{sample.license}</span>
+                {props.onRemoveSample && <button type="button" onClick={() => props.onRemoveSample?.(voice)} aria-label={`Back to the synth ${sampleLabel(voice)}`} title="Back to the synth drum" className="shrink-0 rounded-full px-1.5 text-foreground/45 hover:text-foreground">×</button>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-foreground/10 pt-3">
         <button type="button" onClick={props.onUndo} disabled={history.index <= 0} className="rounded-full px-3 py-1.5 text-xs font-bold text-foreground/60 hover:bg-foreground/5 hover:text-foreground disabled:opacity-30">↶ Undo</button>
         <button type="button" onClick={props.onRedo} disabled={history.index >= history.versions.length - 1} className="rounded-full px-3 py-1.5 text-xs font-bold text-foreground/60 hover:bg-foreground/5 hover:text-foreground disabled:opacity-30">↷ Redo</button>
@@ -114,6 +161,9 @@ export function SongCard(props: SongCardProps) {
             )).reverse()}
           </select>
         </label>
+        <button type="button" onClick={props.onSingOver} aria-pressed={props.bouncing} title="Record this song into the Studio and sing over it" className={`rounded-full border px-3 py-1.5 text-xs font-bold ${props.bouncing ? 'border-red-400 bg-red-500/20 text-red-200' : 'border-primary/50 text-primary hover:bg-primary hover:text-background'}`}>
+          {props.bouncing ? '● Recording… stop' : '🎤 Sing over it'}
+        </button>
         <button type="button" onClick={props.onToggleDrawer} aria-expanded={props.drawerOpen} className={`rounded-full border px-3 py-1.5 text-xs font-bold ${props.drawerOpen ? 'border-secondary text-secondary' : 'border-foreground/15 text-foreground/60 hover:text-foreground'}`}>
           {props.drawerOpen ? 'Close the hood' : 'Under the hood'}
         </button>

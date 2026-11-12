@@ -6,6 +6,7 @@ import {
   activeTake, addInstrumentalTrack, addTakes, addVocalTrack, applyMasterPreset, applyPreset, armedTrack, createProject, MAX_TRACKS, moveClip, newId,
   projectDuration, removeClip, removeTake, removeTrack, ROLE_NAMES, setActiveTake, setGenre, updateChain, updateTrack, type StudioProject, type Take, type Track, type VocalRole,
 } from '../../studio/project'
+import { loadUserPresets, saveUserPreset } from '../../studio/userPresets'
 import { loadAudio, loadProject, pruneAudio, saveAudio, saveProject, takeInbox, type StoredAudio } from '../../studio/storage'
 import { barBeat, clock, estimateLatencyMs, secondsPerBar } from '../../studio/timing'
 import { PauseIcon, PlayIcon, UploadIcon } from '../Icons'
@@ -13,6 +14,7 @@ import { Panel, Slider, Toggle } from '../beatmaker/Slider'
 import { FxPanel, MasterPanel } from './FxPanel'
 import { Timeline } from './Timeline'
 import { LevelMeter } from './Waveform'
+import { followGenre } from '../../theme/store'
 
 type EngineModule = typeof import('../../studio/engine/StudioEngine')
 type MixModule = typeof import('../../studio/engine/mixdown')
@@ -33,10 +35,11 @@ function micError(reason: unknown): string {
  * recording, genre vocal chains, a master bus and WAV export, all in the browser.
  */
 export function Studio() {
-  const [project, setProject] = useState<StudioProject>(() => createProject())
+  const [project, setProject] = useState<StudioProject>(() => { loadUserPresets(); return createProject() })
   const projectRef = useRef(project)
   projectRef.current = project
   const [loaded, setLoaded] = useState(false)
+  const [matching, setMatching] = useState(false)
   const buffers = useRef(new Map<string, AudioBuffer>())
   const [bufferVersion, setBufferVersion] = useState(0)
   const engineModule = useRef<Promise<EngineModule> | undefined>(undefined)
@@ -116,6 +119,7 @@ export function Studio() {
   }, [project, loaded])
 
   useEffect(() => { engineRef.current?.sync(project) }, [project])
+  useEffect(() => { followGenre(project.genre) }, [project.genre])
 
   const ensureEngine = useCallback(async (): Promise<StudioEngine> => {
     if (engineRef.current) return engineRef.current
@@ -339,9 +343,10 @@ export function Studio() {
   }, [])
 
   const applyToSelected = useCallback((presetId: string) => {
-    const current = projectRef.current
-    const target = current.tracks.find((track) => track.id === selectedTrackId && track.kind === 'vocal') ?? armedTrack(current) ?? current.tracks.find((track) => track.kind === 'vocal')
-    if (target) setProject(applyPreset(current, target.id, presetId))
+    setProject((current) => {
+      const target = current.tracks.find((track) => track.id === selectedTrackId && track.kind === 'vocal') ?? armedTrack(current) ?? current.tracks.find((track) => track.kind === 'vocal')
+      return target ? applyPreset(current, target.id, presetId) : current
+    })
   }, [selectedTrackId])
 
   const newSession = useCallback(() => {
@@ -371,10 +376,25 @@ export function Studio() {
       case 'loop': update((current) => ({ ...current, loop: { ...current.loop, on: action.on, end: current.loop.end > current.loop.start ? current.loop.end : current.loop.start + secondsPerBar(current.bpm) * 4 } })); break
       case 'tempo': update((current) => ({ ...current, bpm: Math.max(50, Math.min(240, action.bpm ?? current.bpm + (action.delta ?? 0))) })); break
       case 'import': fileInput.current?.click(); break
+      case 'customPreset': applyToSelected(saveUserPreset(action.name, action.chain, action.description).id); break
+      case 'matchReference': {
+        const current = projectRef.current
+        const vocal = current.tracks.find((track) => track.id === selectedTrackId && track.kind === 'vocal') ?? current.tracks.find((track) => track.kind === 'vocal')
+        if (vocal) setSelectedTrackId(vocal.id)
+        setMatching(true)
+        break
+      }
+      case 'savePreset': {
+        const current = projectRef.current
+        const target = current.tracks.find((track) => track.id === selectedTrackId && track.kind === 'vocal') ?? current.tracks.find((track) => track.kind === 'vocal')
+        if (target?.chain) update((project) => updateTrack(project, target.id, { presetId: saveUserPreset(action.name, target.chain!, 'Saved from the Studio.').id }))
+        break
+      }
     }
-  }, [addTrack, applyToSelected, exportAudio, play, record, stop, update])
+  }, [addTrack, applyToSelected, exportAudio, play, record, selectedTrackId, stop, update])
 
-  useEffect(() => registerStudioHandler(handleAction), [handleAction])
+  // Fret's actions wait until the saved session has loaded, so they aren't overwritten by it.
+  useEffect(() => (loaded ? registerStudioHandler(handleAction) : undefined), [handleAction, loaded])
   useEffect(() => {
     publishStudioStatus({ ready: audioReady, playing, recording, genre: project.genre, bpm: project.bpm, tracks: project.tracks.length, armedTrack: armedTrack(project)?.name })
   }, [audioReady, playing, recording, project])
@@ -478,7 +498,7 @@ export function Studio() {
       {(busy || notice) && <div role="status" className="rounded-2xl border border-primary/20 bg-primary/10 px-5 py-3 text-sm text-primary">{busy ?? notice}</div>}
       {!audioReady && project.tracks.every((track) => !track.clips.length) && (
         <section className="grid gap-4 rounded-3xl border border-dashed border-foreground/15 bg-foreground/[0.015] p-6 sm:grid-cols-[120px_minmax(0,1fr)] sm:items-center">
-          <img src="/riffmancer-emblem.webp" width={120} height={120} alt="" className="mx-auto w-28 rounded-2xl" />
+          <img src="/riffmancer-emblem.webp" width={120} height={120} alt="" className="emblem mx-auto hidden w-28 rounded-2xl sm:block" />
           <ol className="space-y-1.5 text-sm text-foreground/70">
             <li><strong className="text-foreground">1. Import</strong> your instrumental (a Suno MP3 or WAV, Stem Lab stems, or a Beat Maker take).</li>
             <li><strong className="text-foreground">2. Pick your genre</strong> above. Every vocal track gets that genre's chain.</li>
@@ -541,6 +561,13 @@ export function Studio() {
           track={selectedTrack}
           onPreset={(id) => update((current) => applyPreset(current, selectedTrack.id, id))}
           onChange={(changes) => update((current) => updateChain(current, selectedTrack.id, changes))}
+          matching={matching}
+          onMatching={setMatching}
+          onMatchSave={(name, match) => {
+            const preset = saveUserPreset(name, match.chain, `Copied from a song (an estimate): ${match.description}.`)
+            update((current) => applyPreset(current, selectedTrack.id, preset.id))
+            setNotice(`Saved "${preset.name}" under Your presets and put it on ${selectedTrack.name}. It's an estimate, so trust your ears and tweak.`)
+          }}
         />
       )}
       <MasterPanel

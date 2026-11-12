@@ -242,8 +242,23 @@ export const MASTER_PRESETS: MasterPreset[] = [
   { id: 'master-reggaeton', name: 'Reggaeton Gloss', genre: 'reggaeton', description: 'Round low end and a polished top.', chain: { glueThreshold: -16, glueRatio: 2.5, low: 2, high: 2, ceiling: -1, drive: 4 } },
 ]
 
+/** Presets the person made (by describing a sound or copying one from a song). Group id: 'mine'. */
+let userPresets: VocalPreset[] = []
+
+export function setUserPresets(list: VocalPreset[]) {
+  userPresets = list
+}
+
+export function userVocalPresets(): VocalPreset[] {
+  return userPresets
+}
+
+export function allVocalPresets(): VocalPreset[] {
+  return [...VOCAL_PRESETS, ...userPresets]
+}
+
 export function getVocalPreset(id: string): VocalPreset {
-  return VOCAL_PRESETS.find((preset) => preset.id === id) ?? VOCAL_PRESETS.find((preset) => preset.id === 'natural')!
+  return allVocalPresets().find((preset) => preset.id === id) ?? VOCAL_PRESETS.find((preset) => preset.id === 'natural')!
 }
 
 export function getMasterPreset(id: string): MasterPreset {
