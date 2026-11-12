@@ -8,6 +8,7 @@ const LINKS: { route: Route; label: string }[] = [
   { route: 'home', label: 'Home' },
   { route: 'beats', label: 'Beat Maker' },
   { route: 'stems', label: 'Stem Lab' },
+  { route: 'player', label: 'Player' },
 ]
 
 export function NavBar({ route }: { route: Route }) {

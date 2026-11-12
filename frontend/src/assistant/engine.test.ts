@@ -103,8 +103,34 @@ describe('assistant brain', () => {
   })
 
   it('answers every starter chip that is a question', () => {
-    for (const route of ['home', 'beats', 'stems'] as const) {
+    for (const route of ['home', 'beats', 'stems', 'player'] as const) {
       for (const chip of chipsFor(route, beat)) expect(respond(chip, { route, beat }).unknown, chip).toBe(false)
     }
+  })
+})
+
+describe('player commands', () => {
+  const onPlayer = { route: 'player' as const, beat }
+
+  it('opens the player from anywhere', () => {
+    expect(respond('open the player', ctx).navigate).toBe('player')
+    expect(respond('show me the visualizers', { ...ctx, route: 'home' }).navigate).toBe('player')
+  })
+
+  it('drives the player when it is open', () => {
+    expect(respond('play', onPlayer).playerActions).toEqual([{ type: 'play' }])
+    expect(respond('pause', onPlayer).playerActions).toEqual([{ type: 'pause' }])
+    expect(respond('next song', onPlayer).playerActions).toEqual([{ type: 'next' }])
+    expect(respond('switch to milkdrop', onPlayer).playerActions).toEqual([{ type: 'visual', id: 'milkdrop' }])
+    expect(respond('next visual', onPlayer).playerActions).toEqual([{ type: 'visual' }])
+    expect(respond('make it blood red', onPlayer).playerActions).toEqual([{ type: 'theme', id: 'blood' }])
+    expect(respond('full screen', onPlayer).playerActions).toEqual([{ type: 'fullscreen' }])
+    expect(respond('play a demo', onPlayer).playerActions).toEqual([{ type: 'demo' }])
+  })
+
+  it('still sends beat requests to the Beat Maker from the player', () => {
+    const reply = respond('make a metal beat', onPlayer)
+    expect(reply.playerActions).toBeUndefined()
+    expect(reply.navigate).toBe('beats')
   })
 })

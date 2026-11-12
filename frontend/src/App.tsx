@@ -7,6 +7,7 @@ import { NavBar } from './components/NavBar'
 import { useRoute } from './lib/route'
 import { SeparationWorkspace } from './components/SeparationWorkspace'
 import { BeatMaker } from './components/beatmaker/BeatMaker'
+import { Player } from './components/player/Player'
 import { listProjects, uploadProject } from './services/api'
 import type { Project } from './types'
 
@@ -67,6 +68,7 @@ export default function App() {
         {route === 'home' && <Landing />}
         {route === 'beats' && <BeatMaker />}
         {route === 'stems' && <StemLab />}
+        {route === 'player' && <Player />}
       </div>
       <ChatBar route={route} />
     </div>

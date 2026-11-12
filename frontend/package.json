@@ -12,6 +12,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
     "@vitejs/plugin-react": "latest",
+    "butterchurn": "^2.6.7",
+    "butterchurn-presets": "^2.4.7",
     "react": "latest",
     "react-dom": "latest",
     "tone": "15.1.22",

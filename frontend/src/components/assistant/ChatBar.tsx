@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { dispatchBeat, getBeatStatus, OPEN_ASSISTANT_EVENT, subscribeBeatStatus, type BeatStatus } from '../../assistant/bus'
 import { chipsFor, respond, type Mood } from '../../assistant/engine'
+import { dispatchPlayer } from '../../player/bus'
 import { askLive, probeLive, type LiveState } from '../../assistant/live'
 import { ASSISTANT_NAME, GREETING } from '../../assistant/persona'
 import { getGenre } from '../../beatmaker/genres'
@@ -97,6 +98,7 @@ export function ChatBar({ route }: { route: Route }) {
 
     if (reply.navigate && reply.navigate !== route) window.location.hash = hrefFor(reply.navigate)
     for (const action of reply.actions) dispatchBeat(action)
+    for (const action of reply.playerActions ?? []) dispatchPlayer(action)
     setMessages((current) => [...current, { id: nextId.current++, from: 'bot', text: reply.text }])
     setFlash({ mood: reply.mood, until: Date.now() + (reply.mood === 'confused' ? 3000 : 2400) })
   }, [busy, live, messages, route])
