@@ -9,6 +9,7 @@ import { ACCENT, chordNotesFor, cloneGrid, cycleVelocity, mutateGrid, NORMAL } f
 import { loadSession, saveSession, sessionForGenre, type Session } from '../../beatmaker/session'
 import { chordLabel, NOTE_NAMES, noteName, SCALE_LABELS, SCALES, type ScaleName } from '../../beatmaker/theory'
 import { publishBeatStatus, registerBeatHandler, type BeatAction, type SynthTweak } from '../../assistant/bus'
+import { tweakPatch } from '../../beatmaker/tweak'
 import { PauseIcon, PlayIcon } from '../Icons'
 import { DrumGrid } from './DrumGrid'
 import { DrumPads } from './DrumPads'
@@ -422,21 +423,6 @@ export function BeatMaker() {
       </div>
     </div>
   )
-}
-
-/** Small, audible nudges to a patch for chat requests like "make the synth darker". */
-export function tweakPatch(patch: SynthPatch, tweak: SynthTweak): SynthPatch {
-  const clamp = (value: number) => Math.max(0, Math.min(1, value))
-  const name = `${patch.name.replace(/ \(edited\)$/, '')} (edited)`
-  switch (tweak) {
-    case 'darker': return { ...patch, name, cutoff: Math.max(150, patch.cutoff * 0.6) }
-    case 'brighter': return { ...patch, name, cutoff: Math.min(14000, patch.cutoff * 1.6) }
-    case 'heavier': return { ...patch, name, drive: clamp(patch.drive + 0.3) }
-    case 'cleaner': return { ...patch, name, drive: 0 }
-    case 'spacier': return { ...patch, name, reverb: clamp(patch.reverb + 0.25), delay: clamp(patch.delay + 0.15) }
-    case 'drier': return { ...patch, name, reverb: clamp(patch.reverb - 0.25), delay: 0 }
-    case 'wider': return { ...patch, name, chorus: clamp(patch.chorus + 0.35) }
-  }
 }
 
 /** The landing page can ask for a genre by leaving its id in storage before navigating here. */

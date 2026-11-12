@@ -34,7 +34,7 @@ const GENRE_ALIASES: [RegExp, string][] = [
 
 const NOTE_LOOKUP: Record<string, number> = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }
 
-function normalize(text: string) {
+export function normalize(text: string) {
   return text.toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9#&'\s-]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
@@ -57,7 +57,7 @@ export function findKey(text: string): { root?: number; scale?: ScaleName } | un
   return { root, scale }
 }
 
-function findTempo(text: string): { bpm?: number; delta?: number } | undefined {
+export function findTempo(text: string): { bpm?: number; delta?: number } | undefined {
   const exact = text.match(/\b(\d{2,3})\s*(?:bpm|beats per minute)\b/) ?? (/\b(tempo|speed|bpm)\b/.test(text) ? text.match(/\b(\d{2,3})\b/) : null)
   if (exact) return { bpm: Number(exact[1]) }
   if (/\b(a lot|way|much) faster\b|\bdouble time\b/.test(text)) return { delta: 25 }
@@ -67,7 +67,7 @@ function findTempo(text: string): { bpm?: number; delta?: number } | undefined {
   return undefined
 }
 
-function findSynthTweak(text: string): SynthTweak | undefined {
+export function findSynthTweak(text: string): SynthTweak | undefined {
   if (!/\b(synth|sound|lead|tone|guitar|keys)\b/.test(text)) return undefined
   if (/\b(darker|warmer|duller|muffled)\b/.test(text)) return 'darker'
   if (/\b(brighter|sharper|crisper)\b/.test(text)) return 'brighter'

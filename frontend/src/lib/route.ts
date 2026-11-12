@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
-export type Route = 'home' | 'beats' | 'stems'
+export type Route = 'home' | 'create' | 'beats' | 'stems'
 
-const ROUTES: Record<string, Route> = { '': 'home', '#/': 'home', '#/beats': 'beats', '#/stems': 'stems' }
+const ROUTES: Record<string, Route> = { '': 'home', '#/': 'home', '#/create': 'create', '#/beats': 'beats', '#/stems': 'stems' }
 
 export function routeFromHash(hash: string): Route {
   return ROUTES[hash] ?? 'home'

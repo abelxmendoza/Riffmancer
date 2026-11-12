@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { dispatchBeat, getBeatStatus, OPEN_ASSISTANT_EVENT, subscribeBeatStatus, type BeatStatus } from '../../assistant/bus'
+import { dispatchBeat, dispatchSongPrompt, getBeatStatus, OPEN_ASSISTANT_EVENT, subscribeBeatStatus, type BeatStatus } from '../../assistant/bus'
 import { chipsFor, respond, type Mood } from '../../assistant/engine'
 import { askLive, probeLive, type LiveState } from '../../assistant/live'
 import { ASSISTANT_NAME, GREETING } from '../../assistant/persona'
@@ -26,6 +26,11 @@ function loadMessages(): ChatMessage[] {
   } catch {
     return []
   }
+}
+
+function wantsSong(text: string) {
+  const lower = text.toLowerCase()
+  return /\b(make|write|create|give|generate|build|compose|cook)\b/.test(lower) && /\b(song|track|beat|instrumental|banger)\b/.test(lower)
 }
 
 const SUBTITLE: Record<LiveState, string> = {
@@ -73,6 +78,13 @@ export function ChatBar({ route }: { route: Route }) {
     setDraft('')
     const userMessage: ChatMessage = { id: nextId.current++, from: 'user', text }
     setMessages((current) => [...current, userMessage])
+    // Whole songs are written on the Create screen: hand the request over and go there.
+    if (route !== 'beats' && wantsSong(text)) {
+      dispatchSongPrompt(text)
+      setMessages((current) => [...current, { id: nextId.current++, from: 'bot', text: 'On it. Opening Create, where I write the whole song.' }])
+      window.location.hash = hrefFor('create')
+      return
+    }
     const status = getBeatStatus()
     const reply = respond(text, { route, beat: status })
 
