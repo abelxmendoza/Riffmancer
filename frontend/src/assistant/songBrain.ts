@@ -6,6 +6,7 @@ import { findStyle, getStyle, STYLE_VOCALS } from '../song/styles'
 import { defaultPresetFor } from '../studio/presets'
 import { describeVocal, vocalName } from '../studio/vocalSound'
 import type { StudioAction } from './bus'
+import { COPY_VOCAL } from './studioBrain'
 import type { SectionKind, SectionParts, SongSpec } from '../song/spec'
 import { findGenre, findKey, findSynthTweak, findTempo, normalize, type Mood } from './engine'
 import { ASSISTANT_NAME } from './persona'
@@ -153,6 +154,9 @@ export function respondSong(input: string, song: SongSpec | undefined): SongRepl
   if (/^redo\b/.test(text)) return reply('Redone.', { history: 'redo' })
 
   // Vocals: presets for this song, described vocal sounds, and sending the song to the Studio.
+  if (COPY_VOCAL.test(text)) {
+    return reply(`🎯 Opening the Studio: upload the song you like or play it near your mic, and I'll estimate its vocal effects and save them as a preset for your voice. It's an estimate, so trust your ears.`, { studio: [{ type: 'matchReference' }] })
+  }
   if (song && VOCAL_TALK.test(text) && !/\b(no|mute|remove|without)\b.*\bvocals?\b/.test(text)) {
     const toStudio = TO_STUDIO.test(text)
     const vocal = vocalPresetForSong(song, text)

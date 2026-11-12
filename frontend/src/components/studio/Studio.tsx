@@ -38,6 +38,7 @@ export function Studio() {
   const projectRef = useRef(project)
   projectRef.current = project
   const [loaded, setLoaded] = useState(false)
+  const [matching, setMatching] = useState(false)
   const buffers = useRef(new Map<string, AudioBuffer>())
   const [bufferVersion, setBufferVersion] = useState(0)
   const engineModule = useRef<Promise<EngineModule> | undefined>(undefined)
@@ -374,6 +375,13 @@ export function Studio() {
       case 'tempo': update((current) => ({ ...current, bpm: Math.max(50, Math.min(240, action.bpm ?? current.bpm + (action.delta ?? 0))) })); break
       case 'import': fileInput.current?.click(); break
       case 'customPreset': applyToSelected(saveUserPreset(action.name, action.chain, action.description).id); break
+      case 'matchReference': {
+        const current = projectRef.current
+        const vocal = current.tracks.find((track) => track.id === selectedTrackId && track.kind === 'vocal') ?? current.tracks.find((track) => track.kind === 'vocal')
+        if (vocal) setSelectedTrackId(vocal.id)
+        setMatching(true)
+        break
+      }
       case 'savePreset': {
         const current = projectRef.current
         const target = current.tracks.find((track) => track.id === selectedTrackId && track.kind === 'vocal') ?? current.tracks.find((track) => track.kind === 'vocal')
@@ -551,6 +559,13 @@ export function Studio() {
           track={selectedTrack}
           onPreset={(id) => update((current) => applyPreset(current, selectedTrack.id, id))}
           onChange={(changes) => update((current) => updateChain(current, selectedTrack.id, changes))}
+          matching={matching}
+          onMatching={setMatching}
+          onMatchSave={(name, match) => {
+            const preset = saveUserPreset(name, match.chain, `Copied from a song (an estimate): ${match.description}.`)
+            update((current) => applyPreset(current, selectedTrack.id, preset.id))
+            setNotice(`Saved "${preset.name}" under Your presets and put it on ${selectedTrack.name}. It's an estimate, so trust your ears and tweak.`)
+          }}
         />
       )}
       <MasterPanel

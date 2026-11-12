@@ -88,6 +88,8 @@ export type StudioAction =
   | { type: 'import' }
   /** Saves a described or copied vocal sound as one of the person's presets and puts it on the selected track. */
   | { type: 'customPreset'; name: string; chain: VocalChain; description?: string }
+  /** Opens "copy a song's vocal sound" on the selected vocal track. */
+  | { type: 'matchReference' }
   /** Saves the selected track's current effects as a preset. */
   | { type: 'savePreset'; name: string }
 

@@ -59,6 +59,9 @@ export function describedVocalAction(text: string, genre: string): { action: Ext
   }
 }
 
+/** "copy the vocal effects from a song I like", "match the singer's voice on this track". */
+export const COPY_VOCAL = /\b(copy|match|steal|clone|grab|same|recreate|reuse|use)\b.*\b(vocals?|voice|singer|singing)\b.*\b(song|track|record|tune|radio|singer|artist|effects?|sound)\b|\b(vocals?|voice|singer)\b.*\b(like|from) (a|this|that|the|my|some) (song|track|record|tune)\b/
+
 const SAVE_PRESET = /\bsave (this|it|that|the (current )?(sound|chain|effects?)) as (a |my )?(new )?preset(?: called| named)?\s*["“]?([^"”]*)["”]?$/
 
 const isQuestion = (text: string) => /\?$|^(how|what|why|where|when|can|does|do|is|which|who)\b/.test(text)
@@ -75,6 +78,15 @@ export function respondStudio(text: string, context: EngineContext): StudioReply
     return { text: 'Vocals happen in the Studio. Opening it now: import your instrumental, put on headphones and hit Record.', navigate: 'studio' }
   }
   if (!onStudio && !aboutStudio) return undefined
+
+  if (COPY_VOCAL.test(text) && !isQuestion(text.replace(/^can you /, ''))) {
+    return {
+      text: `Let's copy it. Upload the song or play it near your mic${onStudio ? '' : ' in the Studio'}, and I'll estimate the reverb, echo, tone, grit and width on the voice and save it as a preset for yours. It's an estimate, so tweak to taste.`,
+      studioActions: [{ type: 'matchReference' }],
+      navigate: onStudio ? undefined : 'studio',
+      mood: 'ready',
+    }
+  }
 
   // Described vocal sounds work from any page: the preset waits for the Studio to open.
   if (!isQuestion(text) && /\b(vocals?|voice|preset|singing)\b/.test(text) && !PRESET_WORDS.some(([pattern]) => pattern.test(text))) {

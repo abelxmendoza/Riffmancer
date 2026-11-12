@@ -146,7 +146,10 @@ export function CreateScreen() {
       addBot(reply.text)
       setFlash(reply.mood)
       if (reply.sendToStudio && base) void singOver(base, reply.studio)
-      else reply.studio?.filter((action) => action.type === 'customPreset').forEach(dispatchStudio)
+      else {
+        reply.studio?.filter((action) => action.type === 'customPreset' || action.type === 'matchReference').forEach(dispatchStudio)
+        if (reply.studio?.some((action) => action.type === 'matchReference')) window.location.hash = '#/studio'
+      }
       return
     }
 

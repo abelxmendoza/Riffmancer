@@ -95,3 +95,20 @@ describe('Fret and vocal presets', () => {
     expect(respondSong('i want dark doubled vocals with auto-tune', song).text).toMatch(/can't do pitch correction/)
   })
 })
+
+describe('copying a vocal sound from a song', () => {
+  const context = { route: 'create' as const, beat: { ready: false, playing: false, genreId: 'metal', bpm: 150, root: 4, scale: 'minor' as const } }
+  it('opens the matcher from any page', () => {
+    for (const ask of ['copy the vocal effects from a song i like', 'match the vocals on this track', 'i want my voice to sound like the singer from a song on the radio', 'use the same vocal sound as this song']) {
+      const reply = respondStudio(ask, { ...context, route: 'player' })
+      expect(reply?.studioActions, ask).toEqual([{ type: 'matchReference' }])
+      expect(reply?.navigate, ask).toBe('studio')
+    }
+  })
+
+  it('works from Create too', () => {
+    const song = generateSong('punk', { seed: 3 })
+    expect(respondSong('copy the vocal sound from a song i like', song).studio).toEqual([{ type: 'matchReference' }])
+    expect(respondSong('copy the vocal sound from a song i like', undefined).studio).toEqual([{ type: 'matchReference' }])
+  })
+})
