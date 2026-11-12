@@ -18,6 +18,7 @@ const FEATURES = [
   { title: 'Record and download', body: 'Capture a take of everything you hear and download it in one click.' },
   { title: 'Vocal Studio', body: 'Import an AI instrumental, record stacked vocal takes, and dial in genre vocal chains from post punk to screams to reggaeton delay throws.' },
   { title: 'Mix and export', body: 'Master bus with glue and limiter, then export a WAV mix or a zip of stems for any DAW.' },
+  { title: 'Player with visuals', body: 'Play your own songs while the skull headbangs, stars warp and MilkDrop melts your screen in time with the kick.', href: hrefFor('player') },
 ]
 
 export function Landing() {
@@ -98,6 +99,7 @@ export function Landing() {
             <div key={feature.title} className="rounded-3xl border border-foreground/10 bg-surface p-6">
               <h3 className="text-base font-black text-primary">{feature.title}</h3>
               <p className="mt-2 text-sm leading-6 text-foreground/55">{feature.body}</p>
+              {'href' in feature && <a href={feature.href} className="mt-3 inline-block text-xs font-black uppercase tracking-wider text-primary hover:text-secondary">Open the Player →</a>}
             </div>
           ))}
         </div>

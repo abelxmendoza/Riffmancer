@@ -9,6 +9,7 @@ const LINKS: { route: Route; label: string }[] = [
   { route: 'beats', label: 'Beat Maker' },
   { route: 'studio', label: 'Studio' },
   { route: 'stems', label: 'Stem Lab' },
+  { route: 'player', label: 'Player' },
 ]
 
 export function NavBar({ route }: { route: Route }) {

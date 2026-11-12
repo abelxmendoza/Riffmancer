@@ -3,6 +3,8 @@ import { NOTE_NAMES, SCALE_LABELS, type ScaleName } from '../beatmaker/theory'
 import type { Route } from '../lib/route'
 import type { BeatAction, BeatStatus, StudioAction, StudioStatus, SynthTweak } from './bus'
 import { respondStudio } from './studioBrain'
+import type { PlayerAction } from '../player/bus'
+import { THEMES } from '../player/themes'
 import { ASSISTANT_NAME } from './persona'
 
 export type Mood = 'idle' | 'listening' | 'thinking' | 'ready' | 'rocking' | 'confused'
@@ -13,6 +15,8 @@ export interface Reply {
   actions: BeatAction[]
   /** Changes for the Studio. */
   studioActions?: StudioAction[]
+import type { PlayerAction } from '../player/bus'
+import { THEMES } from '../player/themes'
   /** A page to open. */
   navigate?: Route
   /** True when the built-in brain didn't understand; the live model may take over. */
@@ -110,6 +114,7 @@ const ANSWERS: [RegExp, string][] = [
   [/\bwhat('s| is) (a )?chord\b/, 'A chord is a few notes played together. Here one key gives you the whole chord, already in key, so you just pick which one feels right.'],
   [/\bwhat('s| is) (a )?(key|scale)\b|\bwhat('s| is) (a )?mood\b/, 'The key is the home note of the song, and the scale (the "Mood" menu) is the set of notes that sound right with it. Minor feels dark, major feels bright, phrygian feels evil. Try "key of A minor" or "make it darker".'],
   [/\bsynth(esizer)?\b.*\b(how|what|work|use)\b|\b(how|what)\b.*\bsynth(esizer)?\b/, 'The Synthesizer panel shapes three sounds: your melody, the chords and the bass. Pick a preset, then play with Brightness (dark to bright), Pluck (the "wah" at the start), Drive (distortion), Chorus, Echo and Space. Or just tell me "make the synth heavier".'],
+  [/\b(music )?player\b|\bvisuals?\b|\bvisuali[sz](er|ation)s?\b|\bmilk ?drop\b/, 'The Player plays your own songs with visuals that react to the music: Skull Pulse (the emblem headbangs to your kick), Spectrum, Hyperspace, Inferno, Oscilloscope and MilkDrop with 100 trippy presets. Drop your files on the page, and they stay on your computer. Say "open the player" to go there.'],
   [/\bstem ?lab\b|\bstems?\b|\bsplit (a )?song\b/, 'The Stem Lab splits a finished song into vocals, drums, bass and everything else so a band can rehearse it. It needs the local Riffmancer server running. Say "open the stem lab" to go there.'],
   [/\bwhat genres\b|\bwhich genres\b|\blist (the )?genres\b|\bgenres\?/, `I can play ${GENRES.filter((genre) => genre.primary).map((genre) => genre.name).join(', ')}, plus ${GENRES.filter((genre) => !genre.primary).map((genre) => genre.name).join(' and ')}. Just say one, like "make it reggaeton".`],
   [/\bwho are you\b|\bwhat are you\b|\byour name\b/, `I'm ${ASSISTANT_NAME}, Riffmancer's roadie. Bone head, headstock hair, piano-key teeth. I set up the band, explain the buttons, and keep you out of music-theory homework.`],
@@ -131,6 +136,41 @@ export function genreDescription(id: string) {
 function genreTips(id: string) {
   const genre = getGenre(id)
   return `For ${genre.name}: ${genre.tips.join(' ')}`
+}
+
+const VISUAL_WORDS: [RegExp, string][] = [
+  [/\bmilk ?drop\b|\btrippy\b|\bpsychedelic\b|\bwinamp\b/, 'milkdrop'],
+  [/\bskull\b/, 'skull'],
+  [/\bspectrum\b|\bbars\b|\beq\b/, 'spectrum'],
+  [/\bhyperspace\b|\bwarp\b|\bstars?\b|\btunnel\b/, 'warp'],
+  [/\binferno\b|\bfire\b|\bflames?\b|\bembers?\b/, 'inferno'],
+  [/\boscilloscope\b|\bscope\b|\bwave ?form\b/, 'scope'],
+]
+
+const THEME_WORDS: [RegExp, string][] = [
+  [/\bblood\b|\bred\b/, 'blood'],
+  [/\bcold ?wave\b|\bblack and white\b|\bmono(chrome)?\b|\bgr[ae]y\b/, 'coldwave'],
+  [/\bneon\b|\brave\b|\bpurple\b|\bblue\b/, 'neon'],
+  [/\bfuego\b|\borange\b|\bpink\b/, 'fuego'],
+  [/\briot\b|\byellow\b/, 'riot'],
+  [/\btoxic\b|\bgreen\b|\blime\b|\bdefault\b/, 'toxic'],
+]
+
+/** Requests Fret understands while the Player is open. */
+export function playerCommand(text: string): { actions: PlayerAction[]; said: string } | undefined {
+  if (/\bdemo\b/.test(text)) return { actions: [{ type: 'demo' }], said: 'Summoning the demo track. Turn it up.' }
+  if (/\bfull ?screen\b|\bbig(ger)?\b/.test(text)) return { actions: [{ type: 'fullscreen' }], said: 'Full screen. Press Esc to come back.' }
+  if (/\b(next|skip)\b.*\b(song|track|tune)\b|^skip$|^next$/.test(text)) return { actions: [{ type: 'next' }], said: 'Next song.' }
+  if (/\b(previous|last|back)\b.*\b(song|track|tune)\b/.test(text)) return { actions: [{ type: 'previous' }], said: 'Going back a song.' }
+  const isQuestionLike = /\?$|^(what|which|how)\b/.test(text)
+  if (!isQuestionLike) {
+    for (const [pattern, id] of VISUAL_WORDS) if (pattern.test(text)) return { actions: [{ type: 'visual', id }], said: id === 'milkdrop' ? 'MilkDrop on. Say "next visual" for a new trip.' : 'Visual switched.' }
+    if (/\b(next|another|different|change)\b.*\b(visual|look|effect|trip|preset|scene)s?\b/.test(text)) return { actions: [{ type: 'visual' }], said: 'New look coming up.' }
+    for (const [pattern, id] of THEME_WORDS) if (pattern.test(text) && /\b(make|colou?rs?|theme|turn|go|switch|it)\b/.test(text)) return { actions: [{ type: 'theme', id }], said: `Colours set to ${THEMES.find((theme) => theme.id === id)?.name}.` }
+  }
+  if (/\b(pause|stop|silence|shut up|quiet)\b/.test(text)) return { actions: [{ type: 'pause' }], said: 'Paused.' }
+  if (/^(play|resume|go|hit it|start)\b|\bplay (it|music|something)\b/.test(text)) return { actions: [{ type: 'play' }], said: 'Playing. Watch the skull.' }
+  return undefined
 }
 
 /**
@@ -161,6 +201,12 @@ export function respond(input: string, context: EngineContext): Reply {
   }
 
   // Navigation.
+  if (/\b(go|take me|open|show|switch)\b.*\b(music player|player|visuali[sz]ers?)\b/.test(text)) return reply('Opening the Player. Drop in some songs or hit "Play a demo".', { navigate: 'player' })
+  // On the Player page, plain transport words drive the player, unless they ask for a beat or a genre.
+  if (context.route === 'player' && !findGenre(text) && !/\b(beat|groove|drums|bpm|tempo)\b/.test(text)) {
+    const player = playerCommand(text)
+    if (player) return reply(player.said, { playerActions: player.actions, mood: player.actions.some((action) => action.type === 'play' || action.type === 'demo') ? 'rocking' : 'ready' })
+  }
   if (/\b(go|take me|open|show|switch)\b.*\bstem ?lab\b/.test(text)) return reply('Opening the Stem Lab.', { navigate: 'stems' })
   if (/\b(go|take me|back)\b.*\bhome\b|\blanding page\b/.test(text)) return reply('Heading home.', { navigate: 'home' })
   const wantsBeatMaker = /\b(go|take me|open|show)\b.*\bbeat ?maker\b/.test(text)
@@ -262,6 +308,7 @@ export function chipsFor(route: Route, beat: BeatStatus): string[] {
     ]
   }
   if (route === 'studio') return ['Record a take', 'Play', 'Use the scream preset', 'Add a double track', 'Make the vocals reggaeton', 'Turn the click off', 'Export the mix', 'How do I fix latency?']
+  if (route === 'player') return ['Play a demo', 'Next visual', 'Switch to MilkDrop', 'Make it blood red', 'Next song', 'Full screen', 'What visuals are there?']
   if (route === 'stems') return ['What is the Stem Lab?', 'Take me to the Beat Maker', 'Make a punk beat']
   return ['Make a post punk beat', 'Open the studio', 'Tell me about metal', 'What genres can you play?', 'How do I connect my MIDI keyboard?', 'What can you do?']
 }
