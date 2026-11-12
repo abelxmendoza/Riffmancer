@@ -2,7 +2,10 @@ import { getGenre, GENRES } from '../beatmaker/genres'
 import type { ScaleName } from '../beatmaker/theory'
 import type { SongEdit, SoundDescriptions, Target } from '../song/edit'
 import { describesSound, parseSoundRequests, type SoundRequest } from '../song/sound'
-import { findStyle } from '../song/styles'
+import { findStyle, getStyle, STYLE_VOCALS } from '../song/styles'
+import { defaultPresetFor } from '../studio/presets'
+import { describeVocal, vocalName } from '../studio/vocalSound'
+import type { StudioAction } from './bus'
 import type { SectionKind, SectionParts, SongSpec } from '../song/spec'
 import { findGenre, findKey, findSynthTweak, findTempo, normalize, type Mood } from './engine'
 import { ASSISTANT_NAME } from './persona'
@@ -23,6 +26,28 @@ export interface SongReply {
   play?: PlayCommand
   unknown: boolean
   mood: Mood
+  /** Vocal changes for the Studio (held until the Studio opens). */
+  studio?: StudioAction[]
+  /** Bounce the song and open it in the Studio to record vocals over it. */
+  sendToStudio?: boolean
+}
+
+const VOCAL_TALK = /\b(vocals?|voice|singing|sing|vocal preset|mic)\b/
+const TO_STUDIO = /\b(send|take|bring|move|open|put|export)\b.*\b(studio|vocal booth)\b|\b(record|sing|add|lay down|cut|put)\b (my |some |the |a )?(vocals?|singing|voice)\b|\bsing over\b|\brecord (over|on top of) (it|this|the song)\b/
+
+/**
+ * The vocal preset that fits a song: its style's usual vocal, the genre's lead preset, then
+ * whatever the person described on top. Returns the Studio action and the words used.
+ */
+export function vocalPresetForSong(song: SongSpec, request = ''): { action: Extract<StudioAction, { type: 'customPreset' }>; words: string[]; missing: string[] } {
+  const style = getStyle(song.style)
+  const base = defaultPresetFor(song.genreId).chain
+  const styled = style ? describeVocal(STYLE_VOCALS[style.id] ?? '', base) : { chain: base, words: [] as string[], missing: [] as string[] }
+  const asked = request ? describeVocal(request, styled.chain) : { chain: styled.chain, words: [] as string[], missing: [] as string[] }
+  const words = asked.words.length ? asked.words : styled.words
+  const label = asked.words.length ? vocalName(asked.words) : `${style?.name ?? getGenre(song.genreId).name} vocal`
+  const name = `${label} · ${song.title}`.slice(0, 40)
+  return { action: { type: 'customPreset', name, chain: asked.chain, description: `For "${song.title}"${words.length ? `: ${words.join(', ')}` : ''}.` }, words, missing: asked.missing }
 }
 
 const KIND_WORDS: [RegExp, SectionKind][] = [
@@ -126,6 +151,22 @@ export function respondSong(input: string, song: SongSpec | undefined): SongRepl
 
   if (/^(undo|go back|back|nah|revert|previous version|take that back)\b|\bundo (that|it)\b/.test(text)) return reply('Undone. Back to the version before.', { history: 'undo' })
   if (/^redo\b/.test(text)) return reply('Redone.', { history: 'redo' })
+
+  // Vocals: presets for this song, described vocal sounds, and sending the song to the Studio.
+  if (song && VOCAL_TALK.test(text) && !/\b(no|mute|remove|without)\b.*\bvocals?\b/.test(text)) {
+    const toStudio = TO_STUDIO.test(text)
+    const vocal = vocalPresetForSong(song, text)
+    const style = getStyle(song.style)
+    const missing = vocal.missing.length ? ` The Studio can't do ${vocal.missing.join(' or ')} yet, so I left that out.` : ''
+    const studio: StudioAction[] = [{ type: 'genre', id: song.genreId }, { type: 'tempo', bpm: song.bpm }, vocal.action]
+    const sound = vocal.words.length ? ` (${vocal.words.join(', ')})` : ''
+    if (toStudio) {
+      return reply(`🎤 Recording "${song.title}" into the Studio. It plays through once in real time, then the Studio opens with a ${style?.name ?? getGenre(song.genreId).name} vocal preset${sound} on your track.${missing}`, { studio, sendToStudio: true, mood: 'rocking' })
+    }
+    if (/\b(preset|effects?|chain|sound|reverb|delay|echo|distort|dreamy|wide|bright|dark|deep|doubled|dry|telephone|megaphone|auto ?tune|what should|how should)\b/.test(text)) {
+      return reply(`Made the vocal preset "${vocal.action.name}"${sound} and saved it under Your presets in the Studio.${missing} Say "record vocals over this" to take the song there and sing.`, { studio })
+    }
+  }
 
   const genreAsked = findGenre(text)
   const styleAsked = findStyle(soundText(text))
@@ -286,7 +327,8 @@ export const HELP = `I write whole songs and change them when you ask. Try:
 • "faster", "key of D minor", "make it darker", "brighter synth"
 • Any style: "shoegaze song with fuzzy wide guitars", "trap beat with a deep gliding 808", "make it synthwave"
 • Any sound: "make the bass an 808", "piano chords", "glassy bells for the melody", "roomy live drums"
-• "play the chorus", "loop the bridge", "stop", "undo"`
+• "play the chorus", "loop the bridge", "stop", "undo"
+• Vocals: "vocal preset for this song", "dreamy vocals with lots of reverb", "record vocals over this"`
 
 /** Summary line used after edits, e.g. "Made every chorus heavier and set the tempo to 160 BPM." */
 export function describeOutcome(summaries: string[], errors: string[]): string {

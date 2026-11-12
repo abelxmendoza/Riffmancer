@@ -6,6 +6,7 @@ import {
   activeTake, addInstrumentalTrack, addTakes, addVocalTrack, applyMasterPreset, applyPreset, armedTrack, createProject, MAX_TRACKS, moveClip, newId,
   projectDuration, removeClip, removeTake, removeTrack, ROLE_NAMES, setActiveTake, setGenre, updateChain, updateTrack, type StudioProject, type Take, type Track, type VocalRole,
 } from '../../studio/project'
+import { loadUserPresets, saveUserPreset } from '../../studio/userPresets'
 import { loadAudio, loadProject, pruneAudio, saveAudio, saveProject, takeInbox, type StoredAudio } from '../../studio/storage'
 import { barBeat, clock, estimateLatencyMs, secondsPerBar } from '../../studio/timing'
 import { PauseIcon, PlayIcon, UploadIcon } from '../Icons'
@@ -33,7 +34,7 @@ function micError(reason: unknown): string {
  * recording, genre vocal chains, a master bus and WAV export, all in the browser.
  */
 export function Studio() {
-  const [project, setProject] = useState<StudioProject>(() => createProject())
+  const [project, setProject] = useState<StudioProject>(() => { loadUserPresets(); return createProject() })
   const projectRef = useRef(project)
   projectRef.current = project
   const [loaded, setLoaded] = useState(false)
@@ -339,9 +340,10 @@ export function Studio() {
   }, [])
 
   const applyToSelected = useCallback((presetId: string) => {
-    const current = projectRef.current
-    const target = current.tracks.find((track) => track.id === selectedTrackId && track.kind === 'vocal') ?? armedTrack(current) ?? current.tracks.find((track) => track.kind === 'vocal')
-    if (target) setProject(applyPreset(current, target.id, presetId))
+    setProject((current) => {
+      const target = current.tracks.find((track) => track.id === selectedTrackId && track.kind === 'vocal') ?? armedTrack(current) ?? current.tracks.find((track) => track.kind === 'vocal')
+      return target ? applyPreset(current, target.id, presetId) : current
+    })
   }, [selectedTrackId])
 
   const newSession = useCallback(() => {
@@ -371,10 +373,18 @@ export function Studio() {
       case 'loop': update((current) => ({ ...current, loop: { ...current.loop, on: action.on, end: current.loop.end > current.loop.start ? current.loop.end : current.loop.start + secondsPerBar(current.bpm) * 4 } })); break
       case 'tempo': update((current) => ({ ...current, bpm: Math.max(50, Math.min(240, action.bpm ?? current.bpm + (action.delta ?? 0))) })); break
       case 'import': fileInput.current?.click(); break
+      case 'customPreset': applyToSelected(saveUserPreset(action.name, action.chain, action.description).id); break
+      case 'savePreset': {
+        const current = projectRef.current
+        const target = current.tracks.find((track) => track.id === selectedTrackId && track.kind === 'vocal') ?? current.tracks.find((track) => track.kind === 'vocal')
+        if (target?.chain) update((project) => updateTrack(project, target.id, { presetId: saveUserPreset(action.name, target.chain!, 'Saved from the Studio.').id }))
+        break
+      }
     }
-  }, [addTrack, applyToSelected, exportAudio, play, record, stop, update])
+  }, [addTrack, applyToSelected, exportAudio, play, record, selectedTrackId, stop, update])
 
-  useEffect(() => registerStudioHandler(handleAction), [handleAction])
+  // Fret's actions wait until the saved session has loaded, so they aren't overwritten by it.
+  useEffect(() => (loaded ? registerStudioHandler(handleAction) : undefined), [handleAction, loaded])
   useEffect(() => {
     publishStudioStatus({ ready: audioReady, playing, recording, genre: project.genre, bpm: project.bpm, tracks: project.tracks.length, armedTrack: armedTrack(project)?.name })
   }, [audioReady, playing, recording, project])

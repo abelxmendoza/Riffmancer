@@ -44,6 +44,8 @@ interface SongCardProps {
   onRedo: () => void
   onVersion: (index: number) => void
   onToggleDrawer: () => void
+  bouncing: boolean
+  onSingOver: () => void
 }
 
 /** The one thing on screen besides Fret: the song, its parts, and its versions. */
@@ -114,6 +116,9 @@ export function SongCard(props: SongCardProps) {
             )).reverse()}
           </select>
         </label>
+        <button type="button" onClick={props.onSingOver} aria-pressed={props.bouncing} title="Record this song into the Studio and sing over it" className={`rounded-full border px-3 py-1.5 text-xs font-bold ${props.bouncing ? 'border-red-400 bg-red-500/20 text-red-200' : 'border-primary/50 text-primary hover:bg-primary hover:text-background'}`}>
+          {props.bouncing ? '● Recording… stop' : '🎤 Sing over it'}
+        </button>
         <button type="button" onClick={props.onToggleDrawer} aria-expanded={props.drawerOpen} className={`rounded-full border px-3 py-1.5 text-xs font-bold ${props.drawerOpen ? 'border-secondary text-secondary' : 'border-foreground/15 text-foreground/60 hover:text-foreground'}`}>
           {props.drawerOpen ? 'Close the hood' : 'Under the hood'}
         </button>

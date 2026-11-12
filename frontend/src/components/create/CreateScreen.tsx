@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { OPEN_ASSISTANT_EVENT, publishBeatStatus, registerSongPromptHandler } from '../../assistant/bus'
+import { dispatchStudio, OPEN_ASSISTANT_EVENT, publishBeatStatus, registerSongPromptHandler, type StudioAction } from '../../assistant/bus'
 import type { Mood } from '../../assistant/engine'
 import { askSongLive, probeSongLive } from '../../assistant/liveSong'
 import type { LiveState } from '../../assistant/live'
 import { ASSISTANT_NAME } from '../../assistant/persona'
-import { describeOutcome, genreButtons, respondSong, type PlayCommand } from '../../assistant/songBrain'
+import { describeOutcome, genreButtons, respondSong, vocalPresetForSong, type PlayCommand } from '../../assistant/songBrain'
+import { sendToStudio } from '../../studio/storage'
 import { applyEdits, type SongEdit } from '../../song/edit'
 import { generateSong } from '../../song/generate'
 import { commit, currentVersion, goTo, loadHistory, redo, saveHistory, undo, type SongHistory } from '../../song/history'
@@ -97,6 +98,20 @@ export function CreateScreen() {
     void player.play(index)
   }, [player])
 
+  /** Records the song once in real time, hands it to the Studio with a fitting vocal preset, and opens the Studio. */
+  const singOver = useCallback(async (current: SongSpec, actions?: StudioAction[]) => {
+    const vocal = actions ?? [{ type: 'genre', id: current.genreId }, { type: 'tempo', bpm: current.bpm }, vocalPresetForSong(current).action] satisfies StudioAction[]
+    try {
+      const blob = await player.bounce()
+      await sendToStudio(`${current.title} (instrumental)`, blob)
+      for (const action of vocal) dispatchStudio(action)
+      window.location.hash = '#/studio'
+    } catch (reason) {
+      addBot(`Didn't make it to the Studio: ${reason instanceof Error ? reason.message : 'recording failed'}`)
+      setFlash('confused')
+    }
+  }, [player]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const send = useCallback(async (raw: string) => {
     const text = raw.trim()
     if (!text || busy) return
@@ -127,6 +142,14 @@ export function CreateScreen() {
       return
     }
 
+    if (reply.studio || reply.sendToStudio) {
+      addBot(reply.text)
+      setFlash(reply.mood)
+      if (reply.sendToStudio && base) void singOver(base, reply.studio)
+      else reply.studio?.filter((action) => action.type === 'customPreset').forEach(dispatchStudio)
+      return
+    }
+
     if (reply.history) {
       setHistory((current) => (reply.history === 'undo' ? undo(current) : redo(current)))
       addBot(reply.text)
@@ -139,7 +162,7 @@ export function CreateScreen() {
     setFlash(reply.mood)
     if (isNew) { player.setLoopSection(undefined); setSelected(undefined) }
     runPlay(reply.play, result.song ?? base)
-  }, [busy, live, messages, player, runEdits, runPlay])
+  }, [busy, live, messages, player, runEdits, runPlay, singOver])
 
   const sendRef = useRef(send)
   sendRef.current = send
@@ -185,6 +208,8 @@ export function CreateScreen() {
             onRedo={() => setHistory(redo)}
             onVersion={(index) => setHistory((current) => goTo(current, index))}
             onToggleDrawer={() => setDrawerOpen((open) => !open)}
+            bouncing={player.bouncing}
+            onSingOver={() => { if (player.bouncing) player.stop(); else { addBot(`🎤 Recording "${song.title}" into the Studio. It plays through once, then the Studio opens with a vocal preset that fits.`); void singOver(song) } }}
           />
           {player.error && <p role="alert" className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{player.error}</p>}
         </>

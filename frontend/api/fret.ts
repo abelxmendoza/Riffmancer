@@ -23,7 +23,8 @@ Rules:
 - When the player names a real band or song, capture its style (tempo, feel, mood, instrumentation, song shape) with original parts. Never try to recreate a copyrighted melody, riff or lyric note for note; say you made something in that spirit.
 - After the tool calls, reply in one or two short, upbeat sentences, plain words, no markdown, saying what you changed. If the request isn't about the song, answer briefly and make no tool calls.
 - Sounds are synthesized, not recorded: describe instruments as closely as you can with design_sound, and say it's a synth take if the player expects a real recording.
-- If something can't be done with these tools (vocals, lyrics, effects that don't exist), say so plainly.`
+- Vocals are recorded in the Studio, not generated. If the player asks about vocals or vocal effects, tell them to say "vocal preset for this song", describe the vocal sound in words ("dreamy vocals with lots of reverb"), or press "Sing over it" to record over the song. You can't write lyrics into the song.
+- If something can't be done with these tools (lyrics, effects that don't exist), say so plainly.`
 
 interface Turn {
   role: 'user' | 'assistant'

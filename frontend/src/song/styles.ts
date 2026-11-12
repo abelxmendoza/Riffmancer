@@ -99,3 +99,55 @@ export function getStyle(name: string | undefined): Style | undefined {
   const wanted = squash(name)
   return STYLES.find((style) => squash(style.id) === wanted || squash(style.name) === wanted) ?? findStyle(name)
 }
+
+/**
+ * How a lead vocal usually sounds in each style, in the same plain words the Studio understands.
+ * Starting points from common practice, not rules.
+ */
+export const STYLE_VOCALS: Record<string, string> = {
+  shoegaze: 'buried dreamy vocal, wide, lots of reverb, soft',
+  darkwave: 'dark deep vocal, doubled, reverb, slapback',
+  'goth-rock': 'deep dark vocal, huge reverb, echo',
+  'new-wave': 'bright doubled vocal, reverb, chorus',
+  synthwave: 'bright wide vocal, reverb, dotted delay',
+  ebm: 'distorted compressed shout, dry, megaphone',
+  'indie-rock': 'natural doubled vocal, slapback, roomy',
+  'surf-rock': 'slapback vocal, reverb, bright',
+  grunge: 'raspy gritty vocal, doubled, compressed',
+  emo: 'raw shouted vocal, doubled, roomy',
+  'black-metal': 'harsh distorted scream, huge reverb, thin',
+  'death-metal': 'guttural deep growl, distorted, dry, compressed',
+  doom: 'deep dark vocal, huge reverb, echo, distorted',
+  djent: 'compressed scream, distorted, doubled, tight',
+  metalcore: 'compressed scream, distorted, doubled, bright',
+  'nu-metal': 'raspy compressed vocal, doubled, dry',
+  thrash: 'gritty shouted vocal, slapback, compressed',
+  'pop-punk': 'bright doubled shouted vocal, compressed',
+  hardcore: 'raw shouted distorted vocal, dry, compressed',
+  'ska-punk': 'bright shouted vocal, slapback, doubled',
+  'riot-grrrl': 'raw distorted shout, roomy, slapback',
+  'liquid-dnb': 'airy bright vocal, ping pong throws, huge reverb',
+  neurofunk: 'compressed bright mc vocal, dry, tight',
+  jungle: 'compressed mc vocal, dub echo, bright',
+  'jump-up': 'compressed bright mc vocal, dry, tight',
+  breakcore: 'distorted vocal, echo, telephone',
+  dubstep: 'compressed bright vocal, throws, reverb',
+  garage: 'bright smooth vocal, doubled, dotted delay',
+  dembow: 'compressed bright vocal, throws, doubled',
+  perreo: 'bright glossy vocal, throws, doubled',
+  'latin-trap': 'bright compressed vocal, throws, reverb',
+  dancehall: 'bright compressed vocal, dub echo',
+  afrobeats: 'smooth bright vocal, doubled, reverb, throws',
+  cumbia: 'warm natural vocal, slapback, roomy',
+  trap: 'bright compressed upfront vocal, doubled, throws',
+  phonk: 'dark lo-fi vocal, telephone, echo',
+  lofi: 'warm soft vocal, lo-fi, reverb',
+  rnb: 'smooth bright breathy vocal, doubled, reverb, dotted delay',
+  funk: 'warm upfront vocal, dry, compressed',
+  techno: 'dark whispered vocal, huge reverb, echo',
+  trance: 'airy bright vocal, huge reverb, dotted delay, wide',
+  disco: 'bright glossy vocal, doubled, plate reverb',
+  hyperpop: 'bright compressed vocal, distorted, doubled, wide',
+  'synth-pop': 'bright glossy vocal, doubled, reverb',
+  ambient: 'soft breathy vocal, huge reverb, echo, wide',
+}

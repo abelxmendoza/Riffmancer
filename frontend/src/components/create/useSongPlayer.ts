@@ -23,6 +23,9 @@ export function useSongPlayer(song: SongSpec | undefined) {
   const [position, setPosition] = useState<Position>()
   const [loopSection, setLoopSectionState] = useState<number>()
   const loopRef = useRef<number | undefined>(undefined)
+  /** Set while the song is being recorded start to finish (for "Send to Studio"). */
+  const bounceRef = useRef<{ resolve: (blob: Blob) => void; reject: (reason: unknown) => void } | undefined>(undefined)
+  const [bouncing, setBouncing] = useState(false)
 
   const ensureEngine = useCallback(async () => {
     if (engineRef.current) return engineRef.current
@@ -40,6 +43,12 @@ export function useSongPlayer(song: SongSpec | undefined) {
             engine.stop()
             setPlaying(false)
             setPosition(undefined)
+            const bounce = bounceRef.current
+            if (bounce) {
+              bounceRef.current = undefined
+              // Let reverb and delay tails ring out before the recording stops.
+              window.setTimeout(() => { void engine.stopRecording().then(bounce.resolve, bounce.reject).finally(() => setBouncing(false)) }, 1500)
+            }
           }
         })
         engineRef.current = engine
@@ -82,9 +91,15 @@ export function useSongPlayer(song: SongSpec | undefined) {
   }, [ensureEngine])
 
   const stop = useCallback(() => {
-    engineRef.current?.stop()
+    const pending = bounceRef.current
+    bounceRef.current = undefined
+    const engine = engineRef.current
+    if (pending && engine?.isRecording) void engine.stopRecording().catch(() => undefined)
+    engine?.stop()
     setPlaying(false)
     setPosition(undefined)
+    setBouncing(false)
+    pending?.reject(new Error('Stopped before the end of the song.'))
   }, [])
 
   const setLoopSection = useCallback((index: number | undefined) => {
@@ -93,9 +108,29 @@ export function useSongPlayer(song: SongSpec | undefined) {
     if (engineRef.current) engineRef.current.conductor.loopSection = index
   }, [])
 
+  /** Plays the whole song once in real time while recording it, and returns the audio. */
+  const bounce = useCallback(async (): Promise<Blob> => {
+    const engine = await ensureEngine()
+    const current = songRef.current
+    if (!current) throw new Error('No song to record yet.')
+    if (bounceRef.current) throw new Error('Already recording the song.')
+    engine.stop()
+    loopRef.current = undefined
+    setLoopSectionState(undefined)
+    engine.conductor.loopSection = undefined
+    engine.setTempo(current.bpm, current.swing)
+    await engine.startRecording()
+    setBouncing(true)
+    const done = new Promise<Blob>((resolve, reject) => { bounceRef.current = { resolve, reject } })
+    engine.conductor.startAt(0)
+    engine.play()
+    setPlaying(true)
+    return done
+  }, [ensureEngine])
+
   const audition = useCallback(async (voice: DrumVoice) => {
     try { (await ensureEngine()).hitDrum(voice, 0.9) } catch { /* reported */ }
   }, [ensureEngine])
 
-  return { ready, error, playing, position, loopSection, play, stop, setLoopSection, audition }
+  return { ready, error, playing, position, loopSection, bouncing, play, stop, setLoopSection, audition, bounce }
 }

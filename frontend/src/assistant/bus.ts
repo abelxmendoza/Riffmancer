@@ -1,3 +1,4 @@
+import type { VocalChain } from '../studio/presets'
 import type { KeyboardMode } from '../beatmaker/input/keymap'
 import type { ScaleName } from '../beatmaker/theory'
 import type { SynthTweak } from '../beatmaker/tweak'
@@ -85,6 +86,10 @@ export type StudioAction =
   | { type: 'loop'; on: boolean }
   | { type: 'tempo'; bpm?: number; delta?: number }
   | { type: 'import' }
+  /** Saves a described or copied vocal sound as one of the person's presets and puts it on the selected track. */
+  | { type: 'customPreset'; name: string; chain: VocalChain; description?: string }
+  /** Saves the selected track's current effects as a preset. */
+  | { type: 'savePreset'; name: string }
 
 export interface StudioStatus {
   ready: boolean
