@@ -62,3 +62,47 @@ describe('respondSong', () => {
     expect(respondSong('make it sound like a rainy night in Berlin', song).unknown).toBe(true)
   })
 })
+
+describe('Suno-style requests', () => {
+  const song = generateSong('post-punk', { seed: 11 })
+  const edits = (text: string, current = song) => respondSong(text, current).edits
+
+  it('makes a styled song with the sounds described', () => {
+    const [edit] = edits('make a shoegaze song with fuzzy wide guitars and a deep sub bass at 120')
+    expect(edit).toMatchObject({ type: 'new_song', style: 'shoegaze', bpm: 120 })
+    expect(edit.type === 'new_song' && edit.sounds).toMatchObject({ chords: expect.stringContaining('guitars'), bass: expect.stringContaining('sub bass') })
+  })
+
+  it('reads "<style> beat with ..." as a new song even with a song loaded', () => {
+    const [edit] = edits('dark trap beat with a gliding 808 and glassy bells')
+    expect(edit).toMatchObject({ type: 'new_song', style: 'trap' })
+    expect(edit.type === 'new_song' && Object.keys(edit.sounds ?? {}).sort()).toEqual(['bass', 'lead'])
+  })
+
+  it('says so when it does not know a genre, and still makes something', () => {
+    const reply = respondSong('make a polka song', song)
+    expect(reply.text).toMatch(/don't know "polka"/)
+    expect(reply.unknown).toBe(true)
+    expect(reply.edits[0].type).toBe('new_song')
+  })
+
+  it('restyles the current song', () => {
+    expect(edits('make it synthwave')).toEqual([{ type: 'change_genre', style: 'synthwave' }])
+    expect(edits('make it sound like techno')).toEqual([{ type: 'change_genre', style: 'techno' }])
+  })
+
+  it('turns instrument talk into sound design', () => {
+    expect(edits('make the bass an 808')).toEqual([{ type: 'design_sound', part: 'bass', description: expect.stringContaining('808') }])
+    expect(edits('piano chords')[0]).toMatchObject({ type: 'design_sound', part: 'chords' })
+    expect(edits('glassy bells for the melody')[0]).toMatchObject({ type: 'design_sound', part: 'lead' })
+    expect(edits('make the drums roomy and punchy')[0]).toMatchObject({ type: 'design_sound', part: 'drums' })
+    expect(edits('guitars with no distortion')).toEqual([{ type: 'design_sound', part: 'chords', description: expect.stringContaining('clean') }])
+  })
+
+  it('keeps arrangement requests as they were', () => {
+    expect(edits('heavier chorus').map((edit) => edit.type)).toEqual(['energy', 'tone'])
+    expect(edits('make it darker')).toEqual([{ type: 'set_key', scale: 'minor' }])
+    expect(edits('brighter synth')).toEqual([{ type: 'tone', tweak: 'brighter', part: 'all' }])
+    expect(edits('new drums')).toEqual([{ type: 'regenerate', what: 'drums' }])
+  })
+})

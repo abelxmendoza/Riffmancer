@@ -61,6 +61,8 @@ export interface SongSpec {
   version: 1
   title: string
   genreId: string
+  /** The style the person asked for ("Shoegaze"), when it is more specific than the genre engine. */
+  style?: string
   bpm: number
   swing: number
   root: number

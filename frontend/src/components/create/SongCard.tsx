@@ -65,7 +65,7 @@ export function SongCard(props: SongCardProps) {
         </button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-display text-2xl font-black text-foreground sm:text-3xl">{song.title}</h1>
-          <p className="mt-0.5 truncate text-xs font-bold text-foreground/50">{genre.name} · {song.bpm} BPM · {key} · {formatDuration(song)}</p>
+          <p className="mt-0.5 truncate text-xs font-bold text-foreground/50">{song.style ?? genre.name} · {song.bpm} BPM · {key} · {formatDuration(song)}</p>
         </div>
       </div>
 

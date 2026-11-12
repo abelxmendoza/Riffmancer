@@ -1,6 +1,8 @@
 import { getGenre, GENRES } from '../beatmaker/genres'
 import type { ScaleName } from '../beatmaker/theory'
-import type { SongEdit, Target } from '../song/edit'
+import type { SongEdit, SoundDescriptions, Target } from '../song/edit'
+import { describesSound, parseSoundRequests, type SoundRequest } from '../song/sound'
+import { findStyle } from '../song/styles'
 import type { SectionKind, SectionParts, SongSpec } from '../song/spec'
 import { findGenre, findKey, findSynthTweak, findTempo, normalize, type Mood } from './engine'
 import { ASSISTANT_NAME } from './persona'
@@ -81,6 +83,33 @@ function bpmInRange(genreId: string, text: string): number | undefined {
   return undefined
 }
 
+/** Turns "no distortion" into "clean" and the like, so describing words aren't read backwards. */
+function soundText(text: string): string {
+  return text
+    .replace(/\b(no|less|without|zero|not so much|lose the) (distortion|fuzz|grit|drive)\b/g, 'clean')
+    .replace(/\bnot (distorted|fuzzy|gritty)\b/g, 'clean')
+    .replace(/\b(no|less|without|zero|lose the) (reverb|echo|delay|space)\b/g, 'dry')
+    .replace(/\bless (bright|harsh)\b/g, 'dark')
+    .replace(/\bless (dark|muddy|muffled)\b/g, 'bright')
+    // Genre names that would read as instruments ("drum and bass", "metal guitars").
+    .replace(/\bdrum (and|&|n) bass\b|\bd&b\b/g, 'dnb')
+}
+
+function descriptions(requests: SoundRequest[]): SoundDescriptions | undefined {
+  if (!requests.length) return undefined
+  return Object.fromEntries(requests.map((request) => [request.part, request.text]))
+}
+
+const GENERIC = new Set(['a', 'an', 'new', 'some', 'my', 'me', 'us', 'cool', 'sick', 'good', 'nice', 'dope', 'fire', 'banger', 'fast', 'slow', 'quick', 'short', 'long', 'one', 'more', 'another', 'different', 'fresh', 'random', 'whole', 'full', 'real', 'great', 'little', 'big'])
+
+/** The words between "a" and "song" that aren't Fret's genre words ("make a polka song" → "polka"). */
+function namedGenre(text: string): string | undefined {
+  const match = text.match(/\b(?:a|an|some|new|another)\s+([a-z&' -]{2,40}?)\s+(?:song|track|beat|instrumental|tune|banger|jam)\b/)
+  if (!match) return undefined
+  const words = match[1].split(/\s+/).filter((word) => !GENERIC.has(word) && !parseSoundRequests(word).length && !/^(dark|darker|happy|sad|heavy|evil|chill|angry|moody|dreamy|bright|loud|soft|epic|weird)$/.test(word))
+  return words.length ? words.join(' ') : undefined
+}
+
 function capitalize(sentence: string) {
   return sentence.charAt(0).toUpperCase() + sentence.slice(1)
 }
@@ -99,19 +128,34 @@ export function respondSong(input: string, song: SongSpec | undefined): SongRepl
   if (/^redo\b/.test(text)) return reply('Redone.', { history: 'redo' })
 
   const genreAsked = findGenre(text)
+  const styleAsked = findStyle(soundText(text))
   const target = findTarget(text, song)
+  const soundRequests = parseSoundRequests(soundText(text))
 
   // Brand-new song.
   const surprise = /\b(surprise me|anything|whatever|random)\b/.test(text)
-  if (!song || wantsNewSong(text)) {
-    if (!song && !genreAsked && !surprise && !wantsNewSong(text)) {
+  const namesNewSong = Boolean(styleAsked || genreAsked) && /^(a |an )?([a-z0-9&' -]+ )?(song|track|beat|instrumental|tune)\b/.test(text) && !/^(make|turn|change|switch) (it|this)\b/.test(text)
+  if (!song || wantsNewSong(text) || namesNewSong) {
+    if (!song && !genreAsked && !styleAsked && !surprise && !wantsNewSong(text)) {
       return reply(`Let's make something. Pick a sound, like "make a metal song", "drum and bass track at 174" or "reggaeton beat in A minor", or say "surprise me".`, { unknown: true, mood: 'confused' })
     }
     const primary = GENRES.filter((genre) => genre.primary)
-    const genreId = genreAsked ?? (song && !surprise ? song.genreId : primary[Math.floor(Math.random() * primary.length)].id)
     const key = findKey(text)
-    const edit: SongEdit = { type: 'new_song', genre: genreId, bpm: bpmInRange(genreId, text), root: key?.root, scale: key?.scale ?? darkScale(text) }
-    return reply(`🤘 Fresh ${getGenre(genreId).name} song coming up. Tell me what to change: "heavier chorus", "new drums", "faster", "add a bridge".`, { edits: [edit], play: { type: 'play' }, mood: 'rocking' })
+    // "dark trap beat with a gliding 808": the words before "beat" are the style, the rest are sounds.
+    const sounds = descriptions(parseSoundRequests(soundText(text).replace(/^.*?\b(song|track|beat|instrumental|tune|banger|jam)\b/, '')))
+    const withSounds = sounds ? ' with the sounds you described' : ''
+    if (styleAsked) {
+      const at = findTempo(text)?.bpm ?? text.match(/\bat (\d{2,3})\b/)?.[1]
+      const edit: SongEdit = { type: 'new_song', style: styleAsked.id, sounds, bpm: at ? Number(at) : undefined, root: key?.root, scale: key?.scale ?? darkScale(text) }
+      return reply(`🤘 Fresh ${styleAsked.name} song coming up${withSounds}. Tell me what to change: "fuzzier guitars", "deeper 808", "heavier chorus", "faster".`, { edits: [edit], play: { type: 'play' }, mood: 'rocking' })
+    }
+    const unheard = !genreAsked && !surprise ? namedGenre(text) : undefined
+    const genreId = genreAsked ?? (song && !surprise && !unheard ? song.genreId : primary[Math.floor(Math.random() * primary.length)].id)
+    const edit: SongEdit = { type: 'new_song', genre: genreId, sounds, bpm: bpmInRange(genreId, text), root: key?.root, scale: key?.scale ?? darkScale(text) }
+    if (unheard) {
+      return reply(`I don't know "${unheard}" yet, so I started a ${getGenre(genreId).name} song${withSounds}. Describe how it should sound, like "fuzzy guitars, deep 808, roomy drums", and I'll reshape it.`, { edits: [edit], play: { type: 'play' }, unknown: true, mood: 'ready' })
+    }
+    return reply(`🤘 Fresh ${getGenre(genreId).name} song coming up${withSounds}. Tell me what to change: "heavier chorus", "new drums", "faster", "add a bridge".`, { edits: [edit], play: { type: 'play' }, mood: 'rocking' })
   }
   if (!song) return reply('Say "make a metal song" (or any genre) and I\'ll write one.', { unknown: true, mood: 'confused' })
 
@@ -128,9 +172,13 @@ export function respondSong(input: string, song: SongSpec | undefined): SongRepl
     said.push(section ? 'playing from there' : 'playing from the top')
   }
 
-  if (genreAsked && genreAsked !== song.genreId && /\b(make it|turn it|switch|change|convert|as|into|more like)\b/.test(text)) {
+  const restyle = /\b(make it|turn it|switch|change|convert|as|into|more like|sound like|in the style of)\b/.test(text)
+  if (styleAsked && restyle && styleAsked.name !== song.style) {
+    edits.push({ type: 'change_genre', style: styleAsked.id })
+  } else if (genreAsked && restyle && (genreAsked !== song.genreId || song.style)) {
     edits.push({ type: 'change_genre', genre: genreAsked })
   }
+  const restyled = edits.some((edit) => edit.type === 'change_genre')
 
   const feelWord = /\b(half|double)[ -]?time\b/.test(text)
   const tempo = findTempo(text)
@@ -139,19 +187,31 @@ export function respondSong(input: string, song: SongSpec | undefined): SongRepl
   const key = findKey(text)
   if (key) edits.push({ type: 'set_key', ...key })
 
-  const tweak = findSynthTweak(text)
-  const heavy = /\b(heavier|harder|hit harder|more aggressive|more energy|bigger|louder|angrier|more intense|crazier|go off)\b/.test(text)
-  const soft = /\b(softer|calmer|chill(er)?|less busy|quieter|mellow(er)?|smoother|relax(ed)?|tone it down|less intense|emptier)\b/.test(text)
+  const heavyWords = /\b(heavier|harder|hit harder|more aggressive|more energy|bigger|louder|angrier|more intense|crazier|go off)\b/.test(text)
+  const softWords = /\b(softer|calmer|chill(er)?|less busy|quieter|mellow(er)?|smoother|relax(ed)?|tone it down|less intense|emptier)\b/.test(text)
+  // "make the bass an 808", "fuzzier guitars", "roomy drums": describe the sound, Suno-style.
+  const designs = restyled ? [] : soundRequests.filter((request) => {
+    if (request.instrument) return true
+    if (!describesSound(soundText(text)) || target) return false
+    return !((heavyWords || softWords) && request.part === 'drums')
+  })
+  for (const request of designs) edits.push({ type: 'design_sound', part: request.part, description: request.text })
+  const designed = designs.length > 0
+
+  const tweak = designed ? undefined : findSynthTweak(text)
+  // Energy words describe the song unless they were about an instrument's sound.
+  const heavy = heavyWords && !(designed && !target)
+  const soft = softWords && !(designed && !target)
   if (heavy) {
     edits.push({ type: 'energy', direction: 'up', ...target })
     if (/\bheavier|harder|aggressive|angrier\b/.test(text)) edits.push({ type: 'tone', tweak: 'heavier', part: 'chords' })
-  } else if (soft && !tempo) {
+  } else if (soft && !tempo && !designed) {
     edits.push({ type: 'energy', direction: 'down', ...target })
   }
   if (tweak && !(heavy && tweak === 'heavier')) {
     const parts = partsIn(text).filter((part) => part !== 'drums')
     edits.push({ type: 'tone', tweak, part: parts.length === 1 ? (parts[0] as 'bass' | 'chords' | 'lead') : 'all' })
-  } else if (!key && !tweak) {
+  } else if (!key && !tweak && !designed && !restyled) {
     const scale = darkScale(text)
     if (scale) edits.push({ type: 'set_key', scale })
     else if (/\b(happier|brighter|uplifting|happy|major)\b/.test(text)) edits.push({ type: 'set_key', scale: 'major' })
@@ -189,7 +249,10 @@ export function respondSong(input: string, song: SongSpec | undefined): SongRepl
   else if (/\b(no|remove|without|kill)\b.*\bfills?\b/.test(text)) edits.push({ type: 'set_fill', on: false, ...target })
 
   for (const part of partsIn(text)) {
-    if (edits.some((edit) => edit.type === 'regenerate' || edit.type === 'tone')) break
+    if (edits.some((edit) => edit.type === 'regenerate' || edit.type === 'tone' || (edit.type === 'design_sound' && edit.part === part))) {
+      if (/\b(bring in|add|put in)\b/.test(text)) edits.push({ type: 'parts', part, on: true, ...target })
+      continue
+    }
     if (/\b(no|mute|kill|remove|without|turn off|lose|take out|drop the)\b/.test(text)) edits.push({ type: 'parts', part, on: false, ...target })
     else if (/\b(bring back|unmute|bring in|add|turn on|with|put in)\b/.test(text) && !/\badd (a |an )?(fill|intro|verse|chorus|bridge|breakdown|drop|build|break|outro)\b/.test(text)) edits.push({ type: 'parts', part, on: true, ...target })
   }
@@ -203,6 +266,7 @@ export function respondSong(input: string, song: SongSpec | undefined): SongRepl
     return reply(`${lead}${capitalize(said.join(', ') || 'on it')}.`, { edits, play, mood: lead ? 'rocking' : 'ready' })
   }
 
+  if (styleAsked && styleAsked.name !== song.style) return reply(`Want me to turn "${song.title}" into ${styleAsked.name}? Say "make it ${styleAsked.name.toLowerCase()}", or "new ${styleAsked.name.toLowerCase()} song" to start fresh.`)
   if (genreAsked) return reply(`Want me to turn "${song.title}" into ${getGenre(genreAsked).name}? Say "make it ${getGenre(genreAsked).name.toLowerCase()}", or "new ${getGenre(genreAsked).name.toLowerCase()} song" to start fresh.`)
   if (/\b(what|which) (can|do) (you|i)\b|\bhelp\b|\bwhat can you do\b/.test(text)) return reply(HELP)
   return reply(`Hmm, that one's not in my setlist yet. Try "heavier chorus", "new drums in the verse", "add a bridge", "half-time breakdown", "faster", "make it darker" or "undo".`, { unknown: true, mood: 'confused' })
@@ -220,6 +284,8 @@ export const HELP = `I write whole songs and change them when you ask. Try:
 • "new drums", "new chords for the chorus", "new melody"
 • "add a breakdown", "cut the last chorus", "make the intro longer"
 • "faster", "key of D minor", "make it darker", "brighter synth"
+• Any style: "shoegaze song with fuzzy wide guitars", "trap beat with a deep gliding 808", "make it synthwave"
+• Any sound: "make the bass an 808", "piano chords", "glassy bells for the melody", "roomy live drums"
 • "play the chorus", "loop the bridge", "stop", "undo"`
 
 /** Summary line used after edits, e.g. "Made every chorus heavier and set the tempo to 160 BPM." */

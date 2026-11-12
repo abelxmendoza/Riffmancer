@@ -33,7 +33,14 @@ function loadMessages(): ChatMessage[] {
   }
 }
 
-const QUICK_ASKS = ['Heavier', 'Darker', 'Faster', 'New drums', 'Another chorus', 'Half-time breakdown', 'Surprise me']
+const DESCRIBE_IDEAS = [
+  'Shoegaze song with fuzzy wide guitars and a deep sub bass',
+  'Dark trap beat with a gliding 808 and glassy bells',
+  'Synthwave song at 110 with lush pads and roomy drums',
+  'Doom song with huge fuzz guitars',
+]
+
+const QUICK_ASKS = ['Heavier', 'Faster', 'New drums', 'Fuzzier guitars', 'Deep 808 bass', 'Roomy live drums', 'Another chorus', 'Half-time breakdown', 'Surprise me']
 
 /** The main screen: talk to Fret, Fret writes and edits the song. Manual controls live under the hood. */
 export function CreateScreen() {
@@ -127,7 +134,7 @@ export function CreateScreen() {
     }
     const result = runEdits(reply.edits, base)
     const isNew = reply.edits.some((edit) => edit.type === 'new_song')
-    const body = isNew && result.song ? `${reply.text.replace(/song coming up\./, `song: "${result.song.title}".`)}` : result.text || reply.text
+    const body = isNew && result.song ? `${reply.text.replace(/song coming up(.*?)\./, `song$1: "${result.song.title}".`)}` : result.text || reply.text
     addBot(body)
     setFlash(reply.mood)
     if (isNew) { player.setLoopSection(undefined); setSelected(undefined) }
@@ -191,6 +198,12 @@ export function CreateScreen() {
               <button key={genre.id} type="button" onClick={() => void send(genre.prompt)} className="rounded-full border border-primary/40 px-4 py-2 text-sm font-black text-foreground hover:bg-primary hover:text-background">{genre.label}</button>
             ))}
             <button type="button" onClick={() => void send('Surprise me')} className="rounded-full border border-foreground/15 px-4 py-2 text-sm font-black text-foreground/70 hover:border-secondary hover:text-foreground">Surprise me</button>
+          </div>
+          <p className="mt-6 text-xs font-bold uppercase tracking-wider text-foreground/40">Or describe it in your own words</p>
+          <div className="mt-2 flex max-w-xl flex-wrap justify-center gap-2">
+            {DESCRIBE_IDEAS.map((idea) => (
+              <button key={idea} type="button" onClick={() => void send(idea)} className="rounded-2xl border border-foreground/10 px-3 py-2 text-left text-xs text-foreground/70 hover:border-primary hover:text-foreground">“{idea}”</button>
+            ))}
           </div>
         </section>
       )}

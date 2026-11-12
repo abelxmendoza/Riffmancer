@@ -9,11 +9,15 @@ The Create screen (`#/create`) is the main way to make music in Riffmancer. You 
 - **Edits** (`edit.ts`): every change is a `SongEdit` (new song, change genre, tempo, key, energy, feel, regenerate a layer, add/remove/move sections, write patterns, sounds, levels). `applyEdit` validates and explains each change in one line, which becomes the version note.
 - **Player** (`player.ts`): `SongConductor` walks the sections and feeds the shared `AudioEngine` (via `AudioEngine.withTicker`). It handles fills, crashes into new sections, energy-scaled velocity, the melody, start-from-section and loop-a-section.
 - **Versions** (`history.ts`): every Fret change is a new version with undo, redo and a version picker. Hand edits from the drawer merge into one version per control.
+- **Sounds in plain words** (`sound.ts`): "fuzzy wide guitars", "a deep gliding 808", "glassy bells", "roomy punchy drums". Instruments (808, sub, reese, piano, rhodes, organ, strings, pad, bells, flute, chiptune and more) give a starting sound; describing words (dark, bright, distorted, clean, spacey, dry, wide, fat, thin, punchy, soft, plucky, long, gliding, resonant, roomy, low, high) nudge it. If the part already is that instrument ("fuzzier guitars" on a guitar), it is tweaked instead of replaced. The `design_sound` edit applies it; the live AI can also send exact numbers, clamped to safe ranges.
+- **Styles** (`styles.ts`): about 45 named styles (shoegaze, darkwave, doom, djent, black metal, pop punk, hardcore, liquid dnb, neurofunk, jungle, dubstep, dembow, latin trap, trap, phonk, lo-fi, techno, synthwave and more). Each is one of the seven genre engines plus a tempo, mood, drum feel and sound descriptions. Adding one is one line of data. The live AI can also invent a style label on top of the closest engine.
 - **Fret's brains**: `assistant/songBrain.ts` understands common requests offline. Anything it doesn't understand goes to `/api/fret` when `ANTHROPIC_API_KEY` is set on the server; Claude answers with tool calls from `song/tools.ts`, one per `SongEdit`.
 
 ## Things to try
 
 "make a dark post punk song", "drum and bass at 174 in F minor", "heavier chorus", "half-time breakdown", "new drums in the verse", "add a bridge", "cut the last chorus", "make it reggaeton", "loop the chorus", "undo".
+
+Describe it like Suno: "shoegaze song with fuzzy wide guitars and a deep sub bass", "dark trap beat with a gliding 808 and glassy bells", "make it synthwave", "make the bass an 808", "piano chords", "roomy live drums", "guitars with no distortion".
 
 ## Next steps (planned)
 

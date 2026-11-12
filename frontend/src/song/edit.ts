@@ -7,6 +7,8 @@ import {
   halfTimeDrums, progressionPool, pumpDrums, sectionId, songMaterial, varyDrums, type StructureItem,
 } from './generate'
 import { nextSeed, pick, seededRandom, type Random } from './random'
+import { applyKitSettings, applyPatchSettings, designKit, designPatch, SOUND_PARTS, type SoundPart } from './sound'
+import { getStyle, type Style } from './styles'
 import {
   MAX_BARS, MAX_SECTIONS, SECTION_KINDS, SECTION_LABELS, sectionName, sectionProblems, SONG_PARTS,
   type Energy, type Section, type SectionKind, type SectionParts, type SongSpec,
@@ -27,8 +29,8 @@ export interface Target {
 export type RegenerateWhat = 'drums' | 'bass' | 'chords' | 'lead' | 'progression' | 'all'
 
 export type SongEdit =
-  | { type: 'new_song'; genre: string; bpm?: number; root?: number; scale?: ScaleName; title?: string; structure?: StructureItem[] }
-  | { type: 'change_genre'; genre: string }
+  | { type: 'new_song'; genre?: string; style?: string; sounds?: SoundDescriptions; bpm?: number; root?: number; scale?: ScaleName; title?: string; structure?: StructureItem[] }
+  | { type: 'change_genre'; genre?: string; style?: string; sounds?: SoundDescriptions }
   | { type: 'set_tempo'; bpm?: number; delta?: number }
   | { type: 'set_key'; root?: number; scale?: ScaleName }
   | { type: 'set_title'; title: string }
@@ -49,6 +51,10 @@ export type SongEdit =
   | ({ type: 'set_lead'; pattern: string } & Target)
   | { type: 'set_sound'; part: SynthPart; preset: string }
   | { type: 'set_level'; part: MixPart; level: number }
+  | { type: 'design_sound'; part: SoundPart; description?: string; settings?: Record<string, unknown> }
+
+/** Plain-word sound descriptions per part, e.g. { chords: 'fuzzy wide guitars', bass: 'deep 808' }. */
+export type SoundDescriptions = Partial<Record<SoundPart, string>>
 
 export type EditType = SongEdit['type']
 
@@ -120,6 +126,62 @@ function clampEnergy(value: number): Energy {
   return Math.max(1, Math.min(3, Math.round(value))) as Energy
 }
 
+/**
+ * Works out which genre engine and style a new_song / change_genre edit means. A known style
+ * ("shoegaze") brings its engine; an unknown style name with a genre is kept as a label, so the
+ * live AI can invent genres on top of the seven engines.
+ */
+function resolveStyle(edit: { genre?: string; style?: string }): { genreId: string; style?: Style; label?: string } {
+  const style = getStyle(edit.style)
+  if (style) return { genreId: edit.genre ? genreIdFrom(edit.genre) : style.genre, style, label: style.name }
+  if (edit.genre === undefined) {
+    if (edit.style) fail(`I don't know the style "${edit.style}" yet; give a genre to build it on`)
+    fail('give a genre or a style')
+  }
+  const genreId = genreIdFrom(edit.genre)
+  const label = typeof edit.style === 'string' && edit.style.trim() ? edit.style.trim().slice(0, 40) : undefined
+  return { genreId, label }
+}
+
+function setFeel(song: SongSpec, feel: 'half' | 'double' | undefined): SongSpec {
+  if (!feel) return song
+  return { ...song, sections: song.sections.map((section) => ({ ...section, drums: feel === 'half' ? halfTimeDrums(section.drums) : doubleTimeDrums(section.drums) })) }
+}
+
+/** Applies plain-word sound descriptions. Returns the new song and what each part became. */
+function describeSounds(song: SongSpec, sounds: SoundDescriptions | undefined): { song: SongSpec; labels: string[] } {
+  if (!sounds || typeof sounds !== 'object') return { song, labels: [] }
+  let next = song
+  const labels: string[] = []
+  for (const part of SOUND_PARTS) {
+    const description = sounds[part]
+    if (typeof description !== 'string' || !description.trim()) continue
+    if (part === 'drums') {
+      const designed = designKit(description, next.kit)
+      if (designed) { next = { ...next, kit: designed.kit }; labels.push(`${designed.label}`) }
+    } else {
+      const designed = designPatch(description, next.sounds[part], part)
+      if (designed) { next = { ...next, sounds: { ...next.sounds, [part]: designed.patch } }; labels.push(designed.label) }
+    }
+  }
+  return { song: next, labels }
+}
+
+function withStyle(song: SongSpec, style: Style | undefined, label: string | undefined, keep: { bpm?: number; root?: number; scale?: ScaleName }): SongSpec {
+  if (!style) return label ? { ...song, style: label } : song
+  const styled: SongSpec = {
+    ...song,
+    style: label,
+    bpm: clampTempo(keep.bpm ?? style.bpm),
+    root: keep.root ?? style.root ?? song.root,
+    scale: keep.scale ?? style.scale,
+    swing: style.swing ?? song.swing,
+  }
+  return describeSounds(setFeel(styled, style.feel), style.sounds).song
+}
+
+const article = (word: string) => (/^([aeio]|8|11|18)/.test(word) ? 'an' : 'a')
+
 const FEEL_TEXT = { half: 'half-time', double: 'double-time', normal: 'back to the normal groove' } as const
 
 /** Applies one edit and says what changed. Throws EditError with a plain-word reason if it can't. */
@@ -127,23 +189,25 @@ export function applyEdit(song: SongSpec, edit: SongEdit): EditResult {
   const genre = getGenre(song.genreId)
   switch (edit.type) {
     case 'new_song': {
-      const genreId = genreIdFrom(edit.genre)
+      const { genreId, style, label } = resolveStyle(edit)
       if (edit.scale !== undefined && !(edit.scale in SCALES)) fail(`unknown scale "${edit.scale}"`)
       if (edit.root !== undefined && (!Number.isInteger(edit.root) || edit.root < 0 || edit.root > 11)) fail('root must be 0–11 (0 = C)')
       const structure = edit.structure?.filter((item) => SECTION_KINDS.includes(item.kind)).map((item) => ({ kind: item.kind, bars: Math.max(1, Math.min(MAX_BARS, Math.round(item.bars))) })).slice(0, MAX_SECTIONS)
-      const next = generateSong(genreId, { seed: nextSeed(song.seed), title: edit.title, bpm: edit.bpm, root: edit.root, scale: edit.scale, structure })
-      return { song: next, summary: `wrote a new ${getGenre(genreId).name} song, "${next.title}"` }
+      const generated = generateSong(genreId, { seed: nextSeed(song.seed), title: edit.title, bpm: edit.bpm, root: edit.root, scale: edit.scale, structure })
+      const described = describeSounds(withStyle(generated, style, label, edit), edit.sounds)
+      const next = described.song
+      const sound = described.labels.length ? ` with ${described.labels.join(', ')}` : ''
+      return { song: next, summary: `wrote a new ${label ?? getGenre(genreId).name} song, "${next.title}"${sound}` }
     }
     case 'change_genre': {
-      const genreId = genreIdFrom(edit.genre)
+      const { genreId, style, label } = resolveStyle(edit)
       const target = getGenre(genreId)
       const { random } = withSeed(song)
       const material = songMaterial(target, random)
       const sections = song.sections.map((section) => ({ ...buildSection(target, section.kind, section.bars, material, random), id: section.id }))
-      return {
-        song: { ...song, genreId, bpm: target.bpm.default, swing: target.swing, root: target.key.root, scale: target.key.scale, sections, sounds: { bass: target.sounds.bass, chords: target.sounds.chords, lead: target.sounds.lead }, kit: target.sounds.kit, seed: nextSeed(song.seed) },
-        summary: `turned it into ${target.name}, same song shape`,
-      }
+      const base: SongSpec = { ...song, genreId, style: undefined, bpm: target.bpm.default, swing: target.swing, root: target.key.root, scale: target.key.scale, sections, sounds: { bass: target.sounds.bass, chords: target.sounds.chords, lead: target.sounds.lead }, kit: target.sounds.kit, seed: nextSeed(song.seed) }
+      const described = describeSounds(withStyle(base, style, label, {}), edit.sounds)
+      return { song: described.song, summary: `turned it into ${label ?? target.name}, same song shape` }
     }
     case 'set_tempo': {
       if (edit.bpm === undefined && edit.delta === undefined) fail('give a bpm or a delta')
@@ -279,6 +343,24 @@ export function applyEdit(song: SongSpec, edit: SongEdit): EditResult {
       const level = Math.max(0, Math.min(1, Number(edit.level)))
       if (Number.isNaN(level)) fail('level must be 0–1')
       return { song: { ...song, levels: { ...song.levels, [edit.part]: level } }, summary: `set the ${edit.part} volume to ${Math.round(level * 100)}%` }
+    }
+    case 'design_sound': {
+      if (!SOUND_PARTS.includes(edit.part)) fail(`unknown part "${edit.part}" (try ${SOUND_PARTS.join(', ')})`)
+      const settings = edit.settings && typeof edit.settings === 'object' && !Array.isArray(edit.settings) ? edit.settings : undefined
+      const description = typeof edit.description === 'string' ? edit.description.slice(0, 200) : ''
+      if (!description.trim() && !settings) fail('describe the sound or give settings')
+      const partName = edit.part === 'lead' ? 'melody' : edit.part
+      if (edit.part === 'drums') {
+        const designed = description ? designKit(description, song.kit) : undefined
+        if (description && !designed && !settings) fail(`I don't know how to make drums sound "${description}" yet`)
+        const kit = settings ? applyKitSettings(designed?.kit ?? song.kit, settings) : designed!.kit
+        return { song: { ...song, kit }, summary: `gave the drums ${designed ? `${article(designed.label)} ${designed.label} sound` : 'a new sound'}` }
+      }
+      const designed = description ? designPatch(description, song.sounds[edit.part], edit.part) : undefined
+      if (description && !designed && !settings) fail(`I don't know how to make the ${partName} sound "${description}" yet`)
+      let patch = designed?.patch ?? { ...song.sounds[edit.part], name: `${song.sounds[edit.part].name.replace(/ \(edited\)$/, '')} (edited)` }
+      if (settings) patch = applyPatchSettings(patch, settings)
+      return { song: { ...song, sounds: { ...song.sounds, [edit.part]: patch } }, summary: `gave the ${partName} ${designed ? `${article(designed.label)} ${designed.label} sound` : 'a new sound'}` }
     }
     default:
       return fail(`unknown change "${(edit as { type?: string }).type}"`)
