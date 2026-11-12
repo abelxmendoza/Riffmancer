@@ -1,5 +1,6 @@
 import type { SynthPart } from '../beatmaker/engine/types'
 import { DEFAULT_KIT, DEFAULT_PATCH, type KitPatch, type SynthPatch } from '../beatmaker/genres'
+import { getInstrument, isDrumSet, namedInstrument, type RealInstrument } from './instruments'
 
 /**
  * Turns plain words about a sound ("fuzzy wide guitars", "a deep 808", "glassy bells", "roomy
@@ -33,35 +34,47 @@ const INSTRUMENTS: Instrument[] = [
   { name: 'wobble bass', part: 'bass', pattern: /\bwobbl(e|y) bass\b|\bdubstep bass\b/, patch: { wave: 'sawtooth', octave: -1, cutoff: 500, resonance: 9, filterEnv: 3, filterDecay: 0.3, drive: 0.5, sustain: 0.8, volume: -9 } },
   { name: 'acid bass', part: 'bass', pattern: /\bacid\b|\b303\b|\bsquelch(y)?\b/, patch: { wave: 'sawtooth', cutoff: 380, resonance: 13, filterEnv: 4, filterDecay: 0.15, decay: 0.15, sustain: 0.35, drive: 0.35, glide: 0.06, volume: -11 } },
   { name: 'fuzz bass', family: /fuzz|distorted/i, part: 'bass', pattern: /\b(fuzz|fuzzy|distorted|overdriven|dirty|gritty) bass\b/, patch: { wave: 'square', octave: -1, cutoff: 1500, filterEnv: 0.8, sustain: 0.8, drive: 0.7, reverb: 0.05, volume: -10 } },
-  { name: 'bass guitar', family: /bass guitar|pick bass/i, part: 'bass', pattern: /\bbass guitar\b|\bpicked bass\b|\belectric bass\b|\bfinger(ed|style)? bass\b|\bslap bass\b/, patch: { wave: 'triangle', octave: -1, attack: 0.003, decay: 0.35, sustain: 0.5, release: 0.15, cutoff: 1800, filterEnv: 1.6, filterDecay: 0.12, drive: 0.25, reverb: 0.05, volume: -7 } },
+  { name: 'slap bass', family: /bass guitar|slap/i, part: 'bass', pattern: /\bslap(ped|py)? bass\b|\bfunk(y)? bass\b/, patch: { sample: 'slap_bass_1', wave: 'triangle', octave: -1, attack: 0.003, decay: 0.3, sustain: 0.4, release: 0.12, cutoff: 2200, filterEnv: 2, filterDecay: 0.1, drive: 0.1, reverb: 0.04, volume: -7 } },
+  { name: 'picked bass', family: /bass guitar|pick/i, part: 'bass', pattern: /\bpick(ed)? bass\b|\bpunk bass\b/, patch: { sample: 'electric_bass_pick', wave: 'triangle', octave: -1, attack: 0.003, decay: 0.3, sustain: 0.5, release: 0.12, cutoff: 2000, filterEnv: 1.8, filterDecay: 0.1, drive: 0.3, reverb: 0.04, volume: -7 } },
+  { name: 'fretless bass', family: /bass guitar|fretless/i, part: 'bass', pattern: /\bfretless\b/, patch: { sample: 'fretless_bass', wave: 'sine', octave: -1, attack: 0.01, decay: 0.5, sustain: 0.6, release: 0.2, cutoff: 1400, filterEnv: 0.6, glide: 0.04, reverb: 0.1, volume: -7 } },
+  { name: 'bass guitar', family: /bass guitar|pick bass/i, part: 'bass', pattern: /\bbass guitar\b|\belectric bass\b|\bfinger(ed|style)? bass\b|\breal bass\b|\blive bass\b/, patch: { sample: 'electric_bass_finger', wave: 'triangle', octave: -1, attack: 0.003, decay: 0.35, sustain: 0.5, release: 0.15, cutoff: 1800, filterEnv: 1.6, filterDecay: 0.12, drive: 0.25, reverb: 0.05, volume: -7 } },
   { name: 'synth bass', part: 'bass', pattern: /\bsynth ?bass\b|\bmoog bass\b|\banalog bass\b/, patch: { wave: 'sawtooth', octave: -1, cutoff: 900, resonance: 4, filterEnv: 2, filterDecay: 0.2, sustain: 0.6, glide: 0.03, reverb: 0.05, volume: -8 } },
-  { name: 'upright bass', part: 'bass', pattern: /\b(upright|double|acoustic|jazz) bass\b/, patch: { wave: 'triangle', octave: -1, attack: 0.01, decay: 0.5, sustain: 0.2, release: 0.3, cutoff: 1100, filterEnv: 1, filterDecay: 0.1, reverb: 0.15, volume: -6 } },
+  { name: 'upright bass', part: 'bass', pattern: /\b(upright|double|acoustic|jazz) bass\b/, patch: { sample: 'acoustic_bass', wave: 'triangle', octave: -1, attack: 0.01, decay: 0.5, sustain: 0.2, release: 0.3, cutoff: 1100, filterEnv: 1, filterDecay: 0.1, reverb: 0.15, volume: -6 } },
 
   // Chords.
-  { name: 'distorted guitar', family: /guitar/i, part: 'chords', pattern: /\b(fuzz|fuzzy|distorted|overdriven|heavy|crunchy|chuggy|metal|dirty|gritty|loud|shoegaze) guitars?\b|\bpower chords?\b|\bwall of (fuzz|guitars?|noise)\b/, patch: { wave: 'fatsawtooth', spread: 24, attack: 0.004, decay: 0.3, sustain: 0.75, release: 0.2, cutoff: 3200, resonance: 1.5, filterEnv: 0.6, drive: 0.75, chorus: 0.1, reverb: 0.2, volume: -12 } },
-  { name: 'clean guitar', family: /guitar/i, part: 'chords', pattern: /\b(clean|jangly|janglier|chorus(ed)?|shimmer(y|ing)?|twangy|surf|funk(y)?|acoustic|strummed) guitars?\b/, patch: { wave: 'triangle', attack: 0.003, decay: 0.5, sustain: 0.25, release: 0.4, cutoff: 4200, filterEnv: 1.2, filterDecay: 0.15, chorus: 0.55, delay: 0.15, reverb: 0.3, volume: -11 } },
-  { name: 'electric piano', family: /piano|keys/i, part: 'chords', pattern: /\b(electric piano|e-?piano|rhodes|wurli(tzer)?|keys)\b/, patch: { wave: 'sine', attack: 0.004, decay: 0.9, sustain: 0.3, release: 0.7, cutoff: 3000, filterEnv: 0.6, chorus: 0.4, reverb: 0.3, volume: -9 } },
-  { name: 'piano', family: /piano/i, part: 'chords', pattern: /\bpianos?\b/, patch: { wave: 'triangle', attack: 0.002, decay: 1.1, sustain: 0.15, release: 0.9, cutoff: 5000, filterEnv: 1, filterDecay: 0.2, reverb: 0.3, volume: -9 } },
-  { name: 'organ', part: 'chords', pattern: /\borgans?\b|\bhammond\b/, patch: { wave: 'square', attack: 0.01, decay: 0.1, sustain: 1, release: 0.15, cutoff: 2400, filterEnv: 0, chorus: 0.5, reverb: 0.2, volume: -15 } },
-  { name: 'strings', part: 'chords', pattern: /\bstrings?\b|\borchestra(l)?\b|\bviolins\b|\bcellos?\b/, patch: { wave: 'fatsawtooth', spread: 18, attack: 0.5, decay: 0.4, sustain: 0.85, release: 1.2, cutoff: 2600, filterEnv: 0.2, chorus: 0.4, reverb: 0.55, volume: -15 } },
+  { name: 'palm-muted guitar', family: /guitar/i, part: 'chords', pattern: /\bpalm[ -]?mut(ed|ing|e)\b|\bmuted guitars?\b/, patch: { sample: 'electric_guitar_muted', wave: 'square', attack: 0.002, decay: 0.15, sustain: 0.1, release: 0.08, cutoff: 2600, filterEnv: 1.5, filterDecay: 0.08, drive: 0.6, reverb: 0.1, volume: -11 } },
+  { name: 'acoustic guitar', family: /guitar/i, part: 'chords', pattern: /\b(acoustic|strummed|folk|campfire|steel[ -]string) guitars?\b/, patch: { sample: 'acoustic_guitar_steel', wave: 'triangle', attack: 0.003, decay: 0.6, sustain: 0.2, release: 0.5, cutoff: 4000, filterEnv: 1.2, filterDecay: 0.15, reverb: 0.25, volume: -10 } },
+  { name: 'nylon guitar', family: /guitar/i, part: 'chords', pattern: /\b(nylon|classical|spanish|flamenco) guitars?\b/, patch: { sample: 'acoustic_guitar_nylon', wave: 'triangle', attack: 0.003, decay: 0.6, sustain: 0.2, release: 0.5, cutoff: 3500, filterEnv: 1, filterDecay: 0.15, reverb: 0.25, volume: -10 } },
+  { name: 'distorted guitar', family: /guitar/i, part: 'chords', pattern: /\b(fuzz|fuzzy|distorted|overdriven|heavy|crunchy|chuggy|metal|dirty|gritty|loud|shoegaze) guitars?\b|\bpower chords?\b|\bwall of (fuzz|guitars?|noise)\b/, patch: { sample: 'distortion_guitar', wave: 'fatsawtooth', spread: 24, attack: 0.004, decay: 0.3, sustain: 0.75, release: 0.2, cutoff: 3200, resonance: 1.5, filterEnv: 0.6, drive: 0.75, chorus: 0.1, reverb: 0.2, volume: -12 } },
+  { name: 'clean guitar', family: /guitar/i, part: 'chords', pattern: /\b(clean|jangly|janglier|chorus(ed)?|shimmer(y|ing)?|twangy|surf|funk(y)?|electric) guitars?\b/, patch: { sample: 'electric_guitar_clean', wave: 'triangle', attack: 0.003, decay: 0.5, sustain: 0.25, release: 0.4, cutoff: 4200, filterEnv: 1.2, filterDecay: 0.15, chorus: 0.55, delay: 0.15, reverb: 0.3, volume: -11 } },
+  { name: 'electric piano', family: /piano|keys/i, part: 'chords', pattern: /\b(electric piano|e-?piano|rhodes|wurli(tzer)?|keys)\b/, patch: { sample: 'electric_piano_1', wave: 'sine', attack: 0.004, decay: 0.9, sustain: 0.3, release: 0.7, cutoff: 3000, filterEnv: 0.6, chorus: 0.4, reverb: 0.3, volume: -9 } },
+  { name: 'piano', family: /piano/i, part: 'chords', pattern: /\bpianos?\b/, patch: { sample: 'acoustic_grand_piano', wave: 'triangle', attack: 0.002, decay: 1.1, sustain: 0.15, release: 0.9, cutoff: 5000, filterEnv: 1, filterDecay: 0.2, reverb: 0.3, volume: -9 } },
+  { name: 'organ', part: 'chords', pattern: /\borgans?\b|\bhammond\b/, patch: { sample: 'rock_organ', wave: 'square', attack: 0.01, decay: 0.1, sustain: 1, release: 0.15, cutoff: 2400, filterEnv: 0, chorus: 0.5, reverb: 0.2, volume: -15 } },
+  { name: 'synth strings', part: 'chords', pattern: /\bsynth strings?\b|\bstring machine\b|\bsolina\b/, patch: { sample: 'synth_strings_1', wave: 'fatsawtooth', spread: 18, attack: 0.4, decay: 0.4, sustain: 0.85, release: 1.2, cutoff: 2400, filterEnv: 0.2, chorus: 0.5, reverb: 0.5, volume: -14 } },
+  { name: 'strings', part: 'chords', pattern: /\bstrings?\b|\borchestra(l)?\b|\bviolins\b|\bcellos\b/, patch: { sample: 'string_ensemble_1', wave: 'fatsawtooth', spread: 18, attack: 0.5, decay: 0.4, sustain: 0.85, release: 1.2, cutoff: 2600, filterEnv: 0.2, chorus: 0.4, reverb: 0.55, volume: -15 } },
   { name: 'pad', family: /\bpad\b/i, part: 'chords', pattern: /\b(synth )?pads?\b|\bwash(ed)? out\b|\bdrone\b/, patch: { wave: 'fatsawtooth', spread: 30, attack: 0.7, decay: 0.5, sustain: 0.8, release: 1.8, cutoff: 1500, filterEnv: 0.4, chorus: 0.5, reverb: 0.65, volume: -16 } },
-  { name: 'brass', part: 'chords', pattern: /\bbrass\b|\bhorns?\b|\btrumpets?\b/, patch: { wave: 'sawtooth', attack: 0.04, decay: 0.3, sustain: 0.7, release: 0.25, cutoff: 1400, filterEnv: 2, filterDecay: 0.18, reverb: 0.25, volume: -12 } },
-  { name: 'choir', part: 'chords', pattern: /\bchoirs?\b|\bvoices\b|\baahs?\b|\boohs?\b/, patch: { wave: 'fattriangle', spread: 20, attack: 0.35, decay: 0.4, sustain: 0.85, release: 1.2, cutoff: 2000, filterEnv: 0, chorus: 0.6, reverb: 0.6, volume: -13 } },
+  { name: 'brass', part: 'chords', pattern: /\bbrass\b|\bhorns?\b|\btrumpets\b/, patch: { sample: 'brass_section', wave: 'sawtooth', attack: 0.04, decay: 0.3, sustain: 0.7, release: 0.25, cutoff: 1400, filterEnv: 2, filterDecay: 0.18, reverb: 0.25, volume: -12 } },
+  { name: 'choir', part: 'chords', pattern: /\bchoirs?\b|\bvoices\b|\baahs?\b/, patch: { sample: 'choir_aahs', wave: 'fattriangle', spread: 20, attack: 0.35, decay: 0.4, sustain: 0.85, release: 1.2, cutoff: 2000, filterEnv: 0, chorus: 0.6, reverb: 0.6, volume: -13 } },
   { name: 'synth stabs', part: 'chords', pattern: /\bstabs?\b|\brave (chords?|stabs?)\b/, patch: { wave: 'fatsawtooth', spread: 22, attack: 0.002, decay: 0.2, sustain: 0.1, release: 0.15, cutoff: 2600, filterEnv: 2, filterDecay: 0.12, reverb: 0.3, volume: -13 } },
-  { name: 'guitar', family: /guitar/i, part: 'chords', pattern: /\bguitars?\b/, patch: { wave: 'fatsawtooth', spread: 15, attack: 0.004, decay: 0.35, sustain: 0.6, release: 0.25, cutoff: 3000, filterEnv: 0.8, drive: 0.35, chorus: 0.2, reverb: 0.25, volume: -12 } },
+  { name: 'guitar', family: /guitar/i, part: 'chords', pattern: /\bguitars?\b/, patch: { sample: 'overdriven_guitar', wave: 'fatsawtooth', spread: 15, attack: 0.004, decay: 0.35, sustain: 0.6, release: 0.25, cutoff: 3000, filterEnv: 0.8, drive: 0.35, chorus: 0.2, reverb: 0.25, volume: -12 } },
 
   // Lead.
-  { name: 'bells', family: /bell/i, part: 'lead', pattern: /\bbells?\b|\bglockenspiel\b|\bmusic ?box\b|\bchimes?\b/, patch: { wave: 'sine', attack: 0.001, decay: 0.9, sustain: 0, release: 1.2, cutoff: 8000, filterEnv: 0, delay: 0.25, reverb: 0.45, octave: 1, volume: -10 } },
-  { name: 'flute', part: 'lead', pattern: /\bflutes?\b|\bwhistle\b|\bpan ?pipes?\b|\brecorder\b/, patch: { wave: 'sine', attack: 0.06, decay: 0.2, sustain: 0.8, release: 0.3, cutoff: 3000, filterEnv: 0, chorus: 0.2, reverb: 0.35, glide: 0.03, octave: 1, volume: -11 } },
+  { name: 'music box', part: 'lead', pattern: /\bmusic ?box\b/, patch: { sample: 'music_box', wave: 'sine', attack: 0.001, decay: 0.9, sustain: 0, release: 1.2, cutoff: 6000, filterEnv: 0, delay: 0.2, reverb: 0.4, volume: -10 } },
+  { name: 'bells', family: /bell/i, part: 'lead', pattern: /\bbells?\b|\bchimes?\b/, patch: { wave: 'sine', attack: 0.001, decay: 0.9, sustain: 0, release: 1.2, cutoff: 8000, filterEnv: 0, delay: 0.25, reverb: 0.45, octave: 1, volume: -10 } },
+  { name: 'flute', part: 'lead', pattern: /(?<!pan ?)\bflutes?\b/, patch: { sample: 'flute', wave: 'sine', attack: 0.06, decay: 0.2, sustain: 0.8, release: 0.3, cutoff: 3000, filterEnv: 0, chorus: 0.2, reverb: 0.35, glide: 0.03, octave: 1, volume: -11 } },
   { name: 'chiptune lead', part: 'lead', pattern: /\bchip ?tune\b|\b8[ -]?bit\b|\bnintendo\b|\bgame ?boy\b|\bsquare (lead|wave)\b/, patch: { wave: 'square', attack: 0.001, decay: 0.1, sustain: 0.6, release: 0.05, cutoff: 9000, filterEnv: 0, reverb: 0.05, volume: -16 } },
-  { name: 'guitar solo', family: /guitar|shred/i, part: 'lead', pattern: /\b(guitar (solo|lead|riff)|lead guitar|shred(ding)?)\b/, patch: { wave: 'sawtooth', attack: 0.003, decay: 0.3, sustain: 0.8, release: 0.3, cutoff: 3500, resonance: 2, filterEnv: 0.5, drive: 0.8, delay: 0.25, reverb: 0.3, glide: 0.04, volume: -13 } },
-  { name: 'violin', part: 'lead', pattern: /\bviolin\b|\bfiddle\b/, patch: { wave: 'sawtooth', attack: 0.12, decay: 0.3, sustain: 0.85, release: 0.4, cutoff: 3200, filterEnv: 0.2, chorus: 0.2, reverb: 0.45, glide: 0.05, volume: -13 } },
-  { name: 'pluck', part: 'lead', pattern: /\bplucks?\b|\bpizzicato\b|\bmarimba\b|\bkalimba\b/, patch: { wave: 'triangle', attack: 0.001, decay: 0.25, sustain: 0, release: 0.3, cutoff: 5000, filterEnv: 2.5, filterDecay: 0.08, delay: 0.3, reverb: 0.3, volume: -9 } },
+  { name: 'guitar solo', family: /guitar|shred/i, part: 'lead', pattern: /\b(guitar (solo|lead|riff)|lead guitar|shred(ding)?)\b/, patch: { sample: 'distortion_guitar', wave: 'sawtooth', attack: 0.003, decay: 0.3, sustain: 0.8, release: 0.3, cutoff: 3500, resonance: 2, filterEnv: 0.5, drive: 0.8, delay: 0.25, reverb: 0.3, glide: 0.04, volume: -13 } },
+  { name: 'violin', part: 'lead', pattern: /\bviolins?\b(?! section)|\bfiddle\b/, patch: { sample: 'violin', wave: 'sawtooth', attack: 0.12, decay: 0.3, sustain: 0.85, release: 0.4, cutoff: 3200, filterEnv: 0.2, chorus: 0.2, reverb: 0.45, glide: 0.05, volume: -13 } },
+  { name: 'trumpet', part: 'lead', pattern: /\btrumpet\b/, patch: { sample: 'trumpet', wave: 'sawtooth', attack: 0.03, decay: 0.3, sustain: 0.75, release: 0.25, cutoff: 1800, filterEnv: 1.5, filterDecay: 0.15, reverb: 0.25, volume: -11 } },
+  { name: 'saxophone', part: 'lead', pattern: /\bsax(ophone)?s?\b/, patch: { sample: 'alto_sax', wave: 'sawtooth', attack: 0.03, decay: 0.3, sustain: 0.8, release: 0.25, cutoff: 1600, filterEnv: 1, filterDecay: 0.2, glide: 0.03, reverb: 0.3, volume: -11 } },
+  { name: 'marimba', part: 'lead', pattern: /\bmarimbas?\b/, patch: { sample: 'marimba', wave: 'sine', attack: 0.001, decay: 0.4, sustain: 0, release: 0.4, cutoff: 4000, filterEnv: 1, filterDecay: 0.06, reverb: 0.25, volume: -9 } },
+  { name: 'pizzicato', part: 'lead', pattern: /\bpizzicato\b/, patch: { sample: 'pizzicato_strings', wave: 'triangle', attack: 0.001, decay: 0.25, sustain: 0, release: 0.3, cutoff: 4000, filterEnv: 2, filterDecay: 0.08, reverb: 0.35, volume: -9 } },
+  { name: 'pluck', part: 'lead', pattern: /\bplucks?\b/, patch: { wave: 'triangle', attack: 0.001, decay: 0.25, sustain: 0, release: 0.3, cutoff: 5000, filterEnv: 2.5, filterDecay: 0.08, delay: 0.3, reverb: 0.3, volume: -9 } },
   { name: 'saw lead', part: 'lead', pattern: /\b(synth|saw|supersaw|trance|screaming|lead) (lead|synth)\b|\bsupersaw\b/, patch: { wave: 'fatsawtooth', spread: 28, attack: 0.005, sustain: 0.8, release: 0.3, cutoff: 4500, filterEnv: 0.8, chorus: 0.2, delay: 0.25, reverb: 0.3, glide: 0.02, volume: -14 } },
 
   // Drums.
-  { name: '808 drums', part: 'drums', pattern: /\b(808|trap) (drums?|kit|kick)\b/, kit: { kickPitch: 27, kickDecay: 1.1, kickPunch: 0.35, snareTone: 0.2, snareDecay: 0.14, snareBrightness: 5500, hatDecay: 0.03, drive: 0.1, room: 0.08 } },
-  { name: 'live drums', part: 'drums', pattern: /\b(live|real|acoustic|rock) (drums?|kit)\b/, kit: { kickPitch: 38, kickDecay: 0.35, kickPunch: 0.6, snareTone: 0.55, snareDecay: 0.22, snareBrightness: 3500, hatDecay: 0.06, room: 0.35 } },
+  { name: '808 drums', part: 'drums', pattern: /\b(808|trap) (drums?|kit|kick)\b|\btr-?808\b/, kit: { set: 'tr808', kickPitch: 27, kickDecay: 1.1, kickPunch: 0.35, snareTone: 0.2, snareDecay: 0.14, snareBrightness: 5500, hatDecay: 0.03, drive: 0.1, room: 0.08 } },
+  { name: 'live drums', part: 'drums', pattern: /\b(live|real|acoustic|rock|recorded|human|jazz|band) (drums?|kit|drummer)\b|\breal drummer\b/, kit: { set: 'acoustic', kickPitch: 38, kickDecay: 0.35, kickPunch: 0.6, snareTone: 0.55, snareDecay: 0.22, snareBrightness: 3500, hatDecay: 0.06, room: 0.35 } },
   { name: 'drum machine', part: 'drums', pattern: /\bdrum machine\b|\b909\b|\blinn ?drum\b|\b(electronic|machine) drums?\b/, kit: { kickPitch: 34, kickDecay: 0.5, kickPunch: 0.55, snareTone: 0.35, snareDecay: 0.16, snareBrightness: 4500, hatDecay: 0.04, room: 0.1 } },
   { name: 'breakbeat drums', part: 'drums', pattern: /\bbreaks? ?beat\b|\bamen\b|\bdusty drums?\b|\bvinyl drums?\b/, kit: { kickPitch: 40, kickDecay: 0.3, kickPunch: 0.5, snareTone: 0.5, snareDecay: 0.2, snareBrightness: 3200, hatDecay: 0.05, drive: 0.2, room: 0.2 } },
 ]
@@ -138,11 +151,12 @@ export function parseSoundRequests(input: string): SoundRequest[] {
   const requests: SoundRequest[] = []
   for (const clause of clauses) {
     const instrument = findInstrument(clause)
+    const named = instrument ? undefined : namedInstrument(clause)
     const nouns = PART_NOUNS.filter(([pattern]) => pattern.test(clause)).map(([, part]) => part)
-    const part = instrument?.part ?? (nouns.length === 1 ? nouns[0] : undefined)
+    const part = instrument?.part ?? (nouns.length === 1 ? nouns[0] : named?.parts[0])
     const words = describersIn(clause).map((describer) => describer.word)
     if (part) {
-      requests.push({ part, instrument: instrument?.name, words, text: clause })
+      requests.push({ part, instrument: instrument?.name ?? named?.name.toLowerCase(), words, text: clause })
     } else if (words.length && requests.length) {
       const last = requests[requests.length - 1]
       last.words = [...new Set([...last.words, ...words])]
@@ -162,7 +176,7 @@ export function parseSoundRequests(input: string): SoundRequest[] {
 /** True when the text describes how something sounds, not how the song is arranged. */
 export function describesSound(input: string): boolean {
   const text = input.toLowerCase()
-  if (INSTRUMENTS.some((instrument) => instrument.pattern.test(text))) return true
+  if (INSTRUMENTS.some((instrument) => instrument.pattern.test(text)) || namedInstrument(text)) return true
   return !NOT_A_SOUND.test(text) && parseSoundRequests(text).some((request) => request.words.length > 0)
 }
 
@@ -172,15 +186,38 @@ function title(words: string[], instrument: string | undefined, part: SoundPart)
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
+/** Any General MIDI instrument ("banjo", "harpsichord") as a starting sound: the recording plus a plain synth stand-in. */
+function fromLibrary(real: RealInstrument | undefined): Instrument | undefined {
+  if (!real) return undefined
+  const plucked = real.release < 0.6
+  return {
+    name: real.name.toLowerCase(),
+    part: real.parts[0],
+    pattern: /$^/,
+    patch: { sample: real.id, wave: plucked ? 'triangle' : 'sawtooth', octave: 0, attack: plucked ? 0.002 : 0.04, decay: 0.5, sustain: plucked ? 0.2 : 0.8, release: real.release, cutoff: 2500, filterEnv: plucked ? 1 : 0.3, filterDecay: 0.15, drive: 0, chorus: 0, delay: 0, reverb: 0.25, volume: -10 },
+  }
+}
+
+/** The starting sound for a recorded instrument by id ("distortion_guitar", "banjo"), or undefined. */
+export function instrumentPatch(id: string): SynthPatch | undefined {
+  const real = getInstrument(id)
+  if (!real) return undefined
+  const known = INSTRUMENTS.find((instrument) => instrument.patch?.sample === id)
+  const base = known ?? fromLibrary(real)!
+  return { ...DEFAULT_PATCH, ...base.patch, sample: id, name: known ? title([], known.name, known.part) : real.name }
+}
+
 /** Builds a synth sound from a description, starting from `base` when no instrument is named. */
 export function designPatch(description: string, base: SynthPatch, part: SynthPart): { patch: SynthPatch; label: string } | undefined {
   const text = description.toLowerCase()
-  const instrument = findInstrument(text, part) ?? findInstrument(text)
+  const instrument = findInstrument(text, part) ?? findInstrument(text) ?? fromLibrary(namedInstrument(text))
   const describers = describersIn(text)
   if (!instrument?.patch && !describers.some((describer) => describer.patch)) return undefined
   // "fuzzier guitars" on a guitar keeps that guitar and adds fuzz; "piano" on a guitar swaps it.
   const sameInstrument = Boolean(instrument && describers.length && (instrument.family ?? new RegExp(instrument.name, 'i')).test(base.name))
-  const fresh = instrument?.patch && !sameInstrument
+  // A synth stand-in for a real instrument ("Punk guitar") becomes the recording when it's named.
+  const upgrade = Boolean(instrument?.patch?.sample && !base.sample)
+  const fresh = instrument?.patch && (!sameInstrument || upgrade)
   let patch: SynthPatch = fresh ? { ...DEFAULT_PATCH, ...instrument.patch } : { ...base }
   for (const describer of describers) if (describer.patch) patch = { ...patch, ...describer.patch(patch) }
   const words = describers.filter((describer) => describer.patch).map((describer) => describer.word)
@@ -215,7 +252,7 @@ export const PATCH_RANGES: Partial<Record<keyof SynthPatch, [number, number]>> =
   drive: [0, 1], chorus: [0, 1], delay: [0, 1], reverb: [0, 1], glide: [0, 0.5], volume: [-30, 0],
 }
 
-export const KIT_RANGES: Record<keyof KitPatch, [number, number]> = {
+export const KIT_RANGES: Record<Exclude<keyof KitPatch, 'set'>, [number, number]> = {
   kickPitch: [20, 80], kickDecay: [0.05, 2], kickPunch: [0, 1], snareTone: [0, 1], snareDecay: [0.03, 0.6],
   snareBrightness: [800, 12000], hatDecay: [0.01, 0.4], drive: [0, 1], room: [0, 1], volume: [-24, 0],
 }
@@ -227,6 +264,11 @@ export function applyPatchSettings(patch: SynthPatch, settings: Record<string, u
   const next = { ...patch }
   for (const [key, value] of Object.entries(settings)) {
     if (key === 'wave' && WAVES.includes(value as SynthPatch['wave'])) next.wave = value as SynthPatch['wave']
+    // A recorded instrument by id; "synth" or an empty value goes back to the synthesizer.
+    if (key === 'sample') {
+      if (typeof value === 'string' && getInstrument(value)) next.sample = value
+      else if (value === '' || value === null || value === 'synth' || value === false) delete next.sample
+    }
     const range = PATCH_RANGES[key as keyof SynthPatch]
     if (range && typeof value === 'number' && Number.isFinite(value)) (next as unknown as Record<string, number>)[key] = clamp(value, range[0], range[1])
   }
@@ -236,8 +278,13 @@ export function applyPatchSettings(patch: SynthPatch, settings: Record<string, u
 export function applyKitSettings(kit: KitPatch, settings: Record<string, unknown>): KitPatch {
   const next = { ...kit }
   for (const [key, value] of Object.entries(settings)) {
-    const range = KIT_RANGES[key as keyof KitPatch]
-    if (range && typeof value === 'number' && Number.isFinite(value)) next[key as keyof KitPatch] = clamp(value, range[0], range[1])
+    if (key === 'set') {
+      if (isDrumSet(value)) next.set = value
+      else if (value === '' || value === null || value === 'synth' || value === false) delete next.set
+      continue
+    }
+    const range = KIT_RANGES[key as Exclude<keyof KitPatch, 'set'>]
+    if (range && typeof value === 'number' && Number.isFinite(value)) next[key as Exclude<keyof KitPatch, 'set'>] = clamp(value, range[0], range[1])
   }
   return next
 }

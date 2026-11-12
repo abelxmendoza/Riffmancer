@@ -4,6 +4,7 @@ import { SYNTH_TWEAKS } from '../beatmaker/tweak'
 import type { SongEdit } from './edit'
 import { instrumentNames, KIT_RANGES, PATCH_RANGES, SOUND_PARTS, soundWords } from './sound'
 import { STYLES } from './styles'
+import { DRUM_SETS, INSTRUMENT_LIBRARY } from './instruments'
 import { SECTION_KINDS, type SongSpec } from './spec'
 
 /**
@@ -95,6 +96,16 @@ export const SONG_TOOLS: ToolDefinition[] = [
       },
       required: ['part'],
     },
+  },
+  {
+    name: 'next_song',
+    description: 'The player doesn\'t like the song or wants "something totally different" in the same genre: writes a brand new song in the current genre/style with a different band (real and synth instruments from the genre palette), tempo, key and song shape.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'set_instrument',
+    description: `Play a part on a real recorded instrument (General MIDI soundfont) or a bundled real drum kit, by id; "synth" goes back to the synthesizer. Use design_sound instead when the player describes the sound in words. Drum kits: ${DRUM_SETS.map((set) => `${set.id} (${set.name})`).join(', ')}. Instruments: ${INSTRUMENT_LIBRARY.map((instrument) => instrument.id).join(', ')}.`,
+    input_schema: { type: 'object', properties: { part: { type: 'string', enum: SOUND_PARTS }, instrument: { type: 'string', maxLength: 40 } }, required: ['part', 'instrument'] },
   },
   { name: 'set_level', description: 'Set an instrument\'s volume, 0–1.', input_schema: { type: 'object', properties: { part: { type: 'string', enum: ['drums', 'bass', 'chords', 'lead'] }, level: { type: 'number', minimum: 0, maximum: 1 } }, required: ['part', 'level'] } },
 ]

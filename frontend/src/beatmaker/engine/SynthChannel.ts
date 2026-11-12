@@ -1,11 +1,13 @@
 import * as Tone from 'tone'
 import type { SynthPatch } from '../genres'
 import { midiToFrequency } from '../theory'
+import { getInstrument, instrumentSource } from '../../song/instruments'
 
 /**
  * One polyphonic synthesizer with its own effect rack:
  * oscillator → filter (with envelope) → drive → chorus → delay → reverb → volume.
  * Used for the bass, the chord instrument, and the playable lead synth.
+ * A patch with `sample` plays a recorded instrument (Tone.Sampler) through the same rack instead.
  */
 export class SynthChannel {
   readonly synth: Tone.PolySynth<Tone.MonoSynth>
@@ -18,11 +20,17 @@ export class SynthChannel {
   private patch: SynthPatch
   /** Held notes with the frequency they were attacked at, so a later octave change can't strand them. */
   private readonly held = new Map<number, { count: number; frequency: number }>()
+  /** The recorded instrument, when the patch names one and it has loaded. */
+  private sampler?: Tone.Sampler
+  private samplerId?: string
+  private samplerReady: Promise<void> = Promise.resolve()
+  private readonly sampleTone = new Tone.Filter({ type: 'lowpass', frequency: 14000, rolloff: -12 })
 
   constructor(patch: SynthPatch, voices = 8) {
     this.patch = patch
     this.synth = new Tone.PolySynth(Tone.MonoSynth, { maxPolyphony: voices } as never)
     this.synth.chain(this.drive, this.cabinet, this.chorus, this.delay, this.reverb, this.output)
+    this.sampleTone.connect(this.drive)
     this.applyPatch(patch)
   }
 
@@ -54,6 +62,60 @@ export class SynthChannel {
     this.delay.wet.value = patch.delay * 0.6
     this.reverb.wet.value = patch.reverb
     this.synth.volume.value = patch.volume
+    this.useSample(patch)
+  }
+
+  /** Resolves once the current recorded instrument (if any) has loaded or failed. */
+  loaded(): Promise<void> {
+    return this.samplerReady
+  }
+
+  /** True while a recorded instrument is playing instead of the synth. */
+  get sampled(): boolean {
+    return Boolean(this.sampler?.loaded)
+  }
+
+  private useSample(patch: SynthPatch) {
+    const instrument = getInstrument(patch.sample)
+    if (instrument?.id !== this.samplerId) {
+      const old = this.sampler
+      if (old) { old.releaseAll(); window.setTimeout(() => old.dispose(), 2000) }
+      this.sampler = undefined
+      this.samplerId = instrument?.id
+      const source = instrument && instrumentSource(instrument.id)
+      if (instrument && source) {
+        this.samplerReady = new Promise<void>((resolve) => {
+          const sampler = new Tone.Sampler({
+            urls: source.urls,
+            baseUrl: source.baseUrl,
+            onload: () => { if (this.samplerId === instrument.id) this.sampler = sampler; resolve() },
+            // Offline or blocked: keep playing the synth version of the sound.
+            onerror: () => { if (this.samplerId === instrument.id) this.samplerId = undefined; sampler.dispose(); resolve() },
+          }).connect(this.sampleTone)
+          this.pendingSampler = sampler
+        })
+      } else {
+        this.samplerReady = Promise.resolve()
+      }
+    }
+    const target = this.sampler ?? this.pendingSampler
+    if (instrument && target && !target.disposed) {
+      target.set({ attack: Math.min(patch.attack, 0.3), release: Math.max(0.05, Math.min(patch.release, instrument.release * 2)) })
+      target.volume.value = instrument.gain + patch.volume + 10
+      // Synth cutoffs are low because a raw oscillator is harsh; a recording is already shaped,
+      // so the same number opens the tone filter much wider. "Darker" still darkens it.
+      this.sampleTone.frequency.value = Math.max(400, Math.min(18000, patch.cutoff * 4))
+      // Recordings like the distorted guitar already carry their own grit: add less on top.
+      this.drive.distortion = patch.drive * 0.45
+      this.drive.wet.value = patch.drive > 0.15 ? 1 : 0
+    }
+  }
+
+  private pendingSampler?: Tone.Sampler
+
+  /** The sound source for this moment: the recorded instrument once loaded, else the synth. */
+  private get source(): Tone.PolySynth<Tone.MonoSynth> | Tone.Sampler {
+    return this.sampler?.loaded ? this.sampler : this.synth
   }
 
   private frequencies(notes: number[]) {
@@ -61,7 +123,7 @@ export class SynthChannel {
   }
 
   play(notes: number[], duration: number, time: number, velocity: number) {
-    this.synth.triggerAttackRelease(this.frequencies(notes), duration, time, velocity)
+    this.source.triggerAttackRelease(this.frequencies(notes), duration, time, velocity)
   }
 
   /** Starts notes that keep sounding until `release` (for keys held on the keyboard). */
@@ -76,7 +138,7 @@ export class SynthChannel {
         fresh.push(frequency)
       }
     }
-    if (fresh.length) this.synth.triggerAttack(fresh, Tone.immediate(), velocity)
+    if (fresh.length) this.source.triggerAttack(fresh, Tone.immediate(), velocity)
   }
 
   release(notes: number[]) {
@@ -90,16 +152,20 @@ export class SynthChannel {
         done.push(entry.frequency)
       }
     }
-    if (done.length) this.synth.triggerRelease(done, Tone.immediate())
+    if (done.length) { this.synth.triggerRelease(done, Tone.immediate()); this.sampler?.triggerRelease(done, Tone.immediate()) }
   }
 
   releaseAll() {
     this.held.clear()
     this.synth.releaseAll()
+    this.sampler?.releaseAll()
   }
 
   dispose() {
     this.synth.dispose()
+    this.sampler?.dispose()
+    this.pendingSampler?.dispose()
+    this.sampleTone.dispose()
     for (const node of [this.drive, this.cabinet, this.chorus, this.delay, this.reverb, this.output]) node.dispose()
   }
 }

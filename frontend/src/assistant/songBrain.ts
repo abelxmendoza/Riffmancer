@@ -13,6 +13,9 @@ import { COPY_VOCAL } from './studioBrain'
 import type { SectionKind, SectionParts, SongSpec } from '../song/spec'
 import { findGenre, findKey, findSynthTweak, findTempo, normalize, type Mood } from './engine'
 import { ASSISTANT_NAME } from './persona'
+import { INSTRUMENT_LIBRARY } from '../song/instruments'
+
+const LOCAL_NAMES = INSTRUMENT_LIBRARY.filter((instrument) => instrument.local).map((instrument) => instrument.name.toLowerCase()).join(', ')
 
 /**
  * Fret's offline brain for the Create screen: turns plain requests into song edits.
@@ -101,6 +104,12 @@ function partsIn(text: string): (keyof SectionParts)[] {
   return PART_WORDS.filter(([pattern]) => pattern.test(text)).map(([, part]) => part)
 }
 
+/** "Next", "something totally different", "I don't like it": a fresh song in the same genre. */
+const NEXT_SONG = /^(nah,? |nope,? |ugh,? )?(next|skip|skip (it|this|this one)|next (one|song|beat|track|please)|another one|try (again|another one|another)|give me (another one|something else|something different)|something (else|different|totally different|completely different|new)|(i )?(don'?t|do not) (like|love|dig) (it|this|that|this one|the sound|how it sounds)|not feeling (it|this)|(totally|completely) different( one| song| sound| vibe)?|different (one|song|vibe|sound|instrumental|beat))(,? (please|pls|man|dude|bro|fret))?[\s!.?]*$/
+
+/** "What instruments do you have?" */
+const LIST_INSTRUMENTS = /\b(what|which|list|show)\b.*\b(instruments?|sounds)\b.*\b(have|got|there|available|can|use|know)\b|\binstrument list\b/
+
 const wantsNewSong = (text: string) =>
   /\b(make|create|write|generate|give|build|start|cook up|compose|produce|need|want)\b( me| us)? (a|an|some|another|new|one more)\b.*\b(song|track|beat|instrumental|tune|banger|jam)\b/.test(text)
   || /\b(new|fresh|different) (song|track|instrumental)\b/.test(text)
@@ -164,6 +173,13 @@ export function respondSong(input: string, song: SongSpec | undefined): SongRepl
     if (voices.length) return reply('', { edits: voices.map((voice) => ({ type: 'set_sample', voice }) satisfies SongEdit), mood: 'ready' })
   }
 
+  // Before undo, because "nah, next" starts with "nah".
+  if (song && NEXT_SONG.test(text) && !findGenre(text) && !findStyle(soundText(text))) {
+    return reply('', { edits: [{ type: 'next_song' }], play: { type: 'play' }, mood: 'rocking' })
+  }
+  if (LIST_INSTRUMENTS.test(text)) {
+    return reply(`Real recorded: ${LOCAL_NAMES}, plus every General MIDI instrument (banjo, harp, sitar, tuba…). Real drum kits: acoustic and TR-808. Synths: 808 and sub bass, reese, acid, pads, supersaw leads, bells. Say "make the lead a banjo" or "acoustic drums", or hit Next for a whole new band.`)
+  }
   if (/^(undo|go back|back|nah|revert|previous version|take that back)\b|\bundo (that|it)\b/.test(text)) return reply('Undone. Back to the version before.', { history: 'undo' })
   if (/^redo\b/.test(text)) return reply('Redone.', { history: 'redo' })
 

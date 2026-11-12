@@ -1,5 +1,20 @@
 import * as Tone from 'tone'
-import type { DrumVoice, KitPatch } from '../genres'
+import { DRUM_VOICES, type DrumVoice, type KitPatch } from '../genres'
+import { drumSetUrl, isDrumSet } from '../../song/instruments'
+
+/** Kit-set hits are shared by every kit on the page and fetched once. */
+const setBuffers = new Map<string, Promise<Tone.ToneAudioBuffer | undefined>>()
+
+function loadSetBuffer(url: string): Promise<Tone.ToneAudioBuffer | undefined> {
+  let pending = setBuffers.get(url)
+  if (!pending) {
+    pending = new Promise((resolve) => {
+      const buffer = new Tone.ToneAudioBuffer(url, () => resolve(buffer), () => { setBuffers.delete(url); resolve(undefined) })
+    })
+    setBuffers.set(url, pending)
+  }
+  return pending
+}
 
 /**
  * Synthesized drum kit, so no sample files are needed. Any drum can be swapped for a recorded
@@ -25,7 +40,12 @@ export class DrumKit {
   private readonly tomLow = new Tone.MembraneSynth({ octaves: 2, pitchDecay: 0.08, envelope: { attack: 0.001, decay: 0.45, sustain: 0, release: 0.1 } })
   private readonly lastTime = new Map<DrumVoice, number>()
   private kitPatch?: KitPatch
+  /** Hits picked one by one (Freesound). They win over the kit set. */
   private readonly samples = new Map<DrumVoice, Tone.ToneAudioBuffer>()
+  /** The bundled recorded kit in use (acoustic, TR-808), voice by voice. */
+  private readonly setSamples = new Map<DrumVoice, Tone.ToneAudioBuffer>()
+  private setId?: string
+  private setReady: Promise<void> = Promise.resolve()
   private readonly sampleGain = new Tone.Gain(1)
 
   constructor() {
@@ -58,6 +78,24 @@ export class DrumKit {
     this.drive.wet.value = patch.drive > 0 ? 1 : 0
     this.room.wet.value = patch.room
     this.output.volume.value = patch.volume
+    this.useSet(patch.set)
+  }
+
+  private useSet(set: string | undefined) {
+    const id = isDrumSet(set) ? set : undefined
+    if (id === this.setId) return
+    this.setId = id
+    this.setSamples.clear()
+    if (!id) { this.setReady = Promise.resolve(); return }
+    this.setReady = Promise.all(DRUM_VOICES.map(async (voice) => {
+      const buffer = await loadSetBuffer(drumSetUrl(id, voice))
+      if (buffer && this.setId === id) this.setSamples.set(voice, buffer)
+    })).then(() => undefined)
+  }
+
+  /** Resolves once the current kit set's hits have loaded (or failed, leaving those drums synthesized). */
+  loaded(): Promise<void> {
+    return this.setReady
   }
 
   /** Monophonic Tone instruments refuse two starts at the same instant, so nudge repeats forward. */
@@ -91,7 +129,7 @@ export class DrumKit {
   hit(voice: DrumVoice, time: number, velocity: number) {
     const t = this.at(voice, time)
     const v = Math.max(0.05, Math.min(1, velocity))
-    const sample = this.samples.get(voice)
+    const sample = this.samples.get(voice) ?? this.setSamples.get(voice)
     if (sample) { this.playSample(voice, sample, t, v); return }
     switch (voice) {
       case 'kick':
@@ -131,6 +169,7 @@ export class DrumKit {
 
   dispose() {
     this.samples.clear()
+    this.setSamples.clear()
     for (const node of [this.sampleGain, this.output, this.bus, this.drive, this.room, this.kick, this.snareBody, this.snareNoise, this.snareFilter, this.clap, this.clapFilter, this.rim, this.closedHat, this.openHat, this.ride, this.crash, this.tomHigh, this.tomLow]) node.dispose()
   }
 }

@@ -147,6 +147,11 @@ export class AudioEngine<T extends Ticker = Conductor> {
     this.liveKit.applyKit(kit)
   }
 
+  /** Resolves once every recorded instrument and kit set in use has loaded (or fallen back to synth). */
+  async loaded(): Promise<void> {
+    await Promise.all([...Object.values(this.channels), this.liveChords].map((channel) => channel.loaded()).concat(this.bandKit.loaded(), this.liveKit.loaded()))
+  }
+
   /** Swaps one drum for a recorded hit (undefined: back to the synth drum). */
   setDrumSample(voice: DrumVoice, buffer: AudioBuffer | undefined) {
     this.bandKit.setSample(voice, buffer)

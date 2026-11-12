@@ -4,10 +4,12 @@ import { NOTE_NAMES, SCALE_LABELS, SCALES, type ScaleName } from '../beatmaker/t
 import { SYNTH_TWEAKS, tweakPatch, type SynthTweak } from '../beatmaker/tweak'
 import {
   BASS_VARIANTS, buildSection, CHORD_VARIANTS, clampTempo, calmDrums, doubleTimeDrums, drumsForSection, generateLead, generateSong,
-  halfTimeDrums, progressionPool, pumpDrums, sectionId, songMaterial, varyDrums, type StructureItem,
+  halfTimeDrums, progressionPool, pumpDrums, sectionId, songMaterial, STRUCTURES, varyDrums, type StructureItem,
 } from './generate'
 import { nextSeed, pick, seededRandom, type Random } from './random'
-import { applyKitSettings, applyPatchSettings, designKit, designPatch, SOUND_PARTS, type SoundPart } from './sound'
+import { applyKitSettings, applyPatchSettings, designKit, designPatch, instrumentPatch, SOUND_PARTS, type SoundPart } from './sound'
+import { DRUM_SETS, getInstrument, isDrumSet } from './instruments'
+import { pickRoot, pickSounds, pickTempo, varyStructure } from './palettes'
 import { getStyle, type Style } from './styles'
 import { validSample, type SampleRef } from './samples'
 import {
@@ -55,6 +57,10 @@ export type SongEdit =
   | { type: 'design_sound'; part: SoundPart; description?: string; settings?: Record<string, unknown> }
   /** Puts a real recorded hit on one drum, or takes it off (no sample) to go back to the synth drum. */
   | { type: 'set_sample'; voice: DrumVoice; sample?: SampleRef }
+  /** A totally different song in the same genre or style: new sounds, tempo, key, parts and shape. */
+  | { type: 'next_song' }
+  /** Plays a part on a recorded instrument by id (song/instruments.ts), a drum set id, or 'synth' to go back. */
+  | { type: 'set_instrument'; part: SoundPart; instrument: string }
 
 /** Plain-word sound descriptions per part, e.g. { chords: 'fuzzy wide guitars', bass: 'deep 808' }. */
 export type SoundDescriptions = Partial<Record<SoundPart, string>>
@@ -196,8 +202,11 @@ export function applyEdit(song: SongSpec, edit: SongEdit): EditResult {
       if (edit.scale !== undefined && !(edit.scale in SCALES)) fail(`unknown scale "${edit.scale}"`)
       if (edit.root !== undefined && (!Number.isInteger(edit.root) || edit.root < 0 || edit.root > 11)) fail('root must be 0–11 (0 = C)')
       const structure = edit.structure?.filter((item) => SECTION_KINDS.includes(item.kind)).map((item) => ({ kind: item.kind, bars: Math.max(1, Math.min(MAX_BARS, Math.round(item.bars))) })).slice(0, MAX_SECTIONS)
-      const generated = generateSong(genreId, { seed: nextSeed(song.seed), title: edit.title, bpm: edit.bpm, root: edit.root, scale: edit.scale, structure })
-      const described = describeSounds(withStyle(generated, style, label, edit), edit.sounds)
+      const seed = nextSeed(song.seed)
+      const generated = generateSong(genreId, { seed, title: edit.title, bpm: edit.bpm, root: edit.root, scale: edit.scale, structure })
+      // Nothing said about the sound: start from a band that fits the genre (often real instruments).
+      const palette = style ? undefined : pickSounds(genreId, seededRandom(seed ^ 0x5bd1))
+      const described = describeSounds(withStyle(generated, style, label, edit), { ...palette, ...edit.sounds })
       const next = described.song
       const sound = described.labels.length ? ` with ${described.labels.join(', ')}` : ''
       return { song: next, summary: `wrote a new ${label ?? getGenre(genreId).name} song, "${next.title}"${sound}` }
@@ -379,9 +388,70 @@ export function applyEdit(song: SongSpec, edit: SongEdit): EditResult {
       samples[edit.voice] = sample
       return { song: { ...song, samples }, summary: `put a real ${label} on: "${sample!.name}" by ${sample!.author} (${sample!.license})` }
     }
+    case 'next_song':
+      return nextSong(song)
+    case 'set_instrument': {
+      const id = String(edit.instrument ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_')
+      if (!SOUND_PARTS.includes(edit.part)) fail(`unknown part "${edit.part}"`)
+      if (edit.part === 'drums') {
+        const setId = DRUM_SETS.find((set) => set.id === id.replace(/_/g, '') || set.name.toLowerCase().replace(/[\s-]+/g, '_') === id)?.id ?? id
+        if (id === 'synth' || id === 'synth_drums') {
+          if (!song.kit.set) fail('the drums are already synthesized')
+          const { set: _set, ...kit } = song.kit
+          return { song: { ...song, kit }, summary: 'went back to the synth drums' }
+        }
+        if (!isDrumSet(setId)) fail(`unknown drum kit "${edit.instrument}" (try ${DRUM_SETS.map((set) => set.id).join(', ')} or synth)`)
+        const name = DRUM_SETS.find((set) => set.id === setId)!.name
+        return { song: { ...song, kit: { ...song.kit, set: setId } }, summary: `put the drums on the ${name.toLowerCase()}` }
+      }
+      const partName = edit.part === 'chords' ? 'chords' : edit.part
+      if (id === 'synth') {
+        const current = song.sounds[edit.part]
+        if (!current.sample) fail(`the ${partName} is already a synth`)
+        const { sample: _sample, ...patch } = current
+        return { song: { ...song, sounds: { ...song.sounds, [edit.part]: { ...patch, name: `${patch.name} (synth)` } } }, summary: `put the ${partName} back on the synth` }
+      }
+      const patch = instrumentPatch(id)
+      if (!patch) fail(`I don't have an instrument called "${edit.instrument}"`)
+      return { song: { ...song, sounds: { ...song.sounds, [edit.part]: patch! } }, summary: `put the ${partName} on ${getInstrument(id)!.name.toLowerCase()}` }
+    }
     default:
       return fail(`unknown change "${(edit as { type?: string }).type}"`)
   }
+}
+
+/**
+ * The "Next" button: same genre (or style), everything else fresh. New parts, a different band
+ * from the genre's palette, another tempo and key, and a varied song shape.
+ */
+function nextSong(song: SongSpec): EditResult {
+  const genre = getGenre(song.genreId)
+  const seed = nextSeed(song.seed)
+  const random = seededRandom(seed ^ 0x2c1b)
+  const style = getStyle(song.style)
+  const structure = varyStructure(STRUCTURES[genre.id] ?? STRUCTURES['post-punk'], random)
+  const bpm = style ? clampTempo(style.bpm + Math.round((random() - 0.5) * 16)) : pickTempo(genre, random, song.bpm)
+  const generated = generateSong(genre.id, { seed, bpm, root: pickRoot(random, song.root), scale: style?.scale ?? song.scale, structure })
+  // Skip any sound the song already has, so pressing Next always changes the band.
+  const sounds = pickSounds(genre.id, random)
+  for (const part of SOUND_PARTS) {
+    for (let tries = 0; tries < 4 && sameSound(song, part, sounds[part]); tries += 1) sounds[part] = pickSounds(genre.id, random)[part]
+  }
+  const styled: SongSpec = { ...generated, style: song.style, swing: style?.swing ?? generated.swing, levels: song.levels }
+  // A known style keeps its signature sounds for the parts it names; the rest come from the palette.
+  const described = describeSounds(style ? setFeel(styled, style.feel) : styled, { ...sounds, ...(style && random() < 0.5 ? style.sounds : {}) })
+  const next = described.song
+  const key = `${NOTE_NAMES[next.root]} ${SCALE_LABELS[next.scale].toLowerCase()}`
+  return { song: next, summary: `something different: "${next.title}", ${next.bpm} BPM in ${key}, with ${described.labels.join(', ')}` }
+}
+
+function sameSound(song: SongSpec, part: SoundPart, description: string): boolean {
+  if (part === 'drums') {
+    const designed = designKit(description, song.kit)
+    return Boolean(designed && JSON.stringify(designed.kit) === JSON.stringify(song.kit))
+  }
+  const designed = designPatch(description, song.sounds[part], part)
+  return Boolean(designed && designed.patch.name.toLowerCase() === song.sounds[part].name.toLowerCase())
 }
 
 export interface EditsOutcome {

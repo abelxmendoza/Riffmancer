@@ -7,7 +7,7 @@ import { ASSISTANT_NAME } from '../../assistant/persona'
 import { describeOutcome, genreButtons, respondSong, vocalPresetForSong, type PlayCommand, type SongReply } from '../../assistant/songBrain'
 import type { DrumVoice } from '../../beatmaker/genres/types'
 import { sampleLabel, type SampleRef } from '../../song/samples'
-import { searchSamples } from '../../services/freesound'
+import { SamplesUnavailable, searchSamples } from '../../services/freesound'
 import { sendToStudio } from '../../studio/storage'
 import { applyEdits, type SongEdit } from '../../song/edit'
 import { generateSong } from '../../song/generate'
@@ -45,7 +45,7 @@ const DESCRIBE_IDEAS = [
   'Doom song with huge fuzz guitars',
 ]
 
-const QUICK_ASKS = ['Heavier', 'Faster', 'Real recorded drums', 'New drums', 'Fuzzier guitars', 'Deep 808 bass', 'Roomy live drums', 'Another chorus', 'Half-time breakdown', 'Surprise me']
+const QUICK_ASKS = ['Something totally different', 'Heavier', 'Faster', 'Live acoustic drums', 'Distorted guitars', 'Picked bass guitar', 'Make the lead a sax', 'Piano chords', 'Deep 808 bass', 'Real recorded drums', 'Another chorus', 'What instruments do you have?']
 
 /** The main screen: talk to Fret, Fret writes and edits the song. Manual controls live under the hood. */
 export function CreateScreen() {
@@ -100,7 +100,7 @@ export function CreateScreen() {
     if (command.type === 'stop') { player.stop(); return }
     const index = command.section ? command.section - 1 : 0
     if (command.type === 'loop') { player.setLoopSection(index); setSelected(index) } else if (command.section) setSelected(index)
-    void player.play(index)
+    void player.play(index, current)
   }, [player])
 
   /** Records the song once in real time, hands it to the Studio with a fitting vocal preset, and opens the Studio. */
@@ -148,11 +148,17 @@ export function CreateScreen() {
       }
     } catch (reason) {
       problem = reason instanceof Error ? reason.message : 'Sample search failed.'
+      // No Freesound here: the bundled recorded kit still gives real drums.
+      if (reason instanceof SamplesUnavailable && !edits.length && base.kit.set !== 'acoustic') {
+        edits.push({ type: 'set_instrument', part: 'drums', instrument: 'acoustic' })
+        problem = `${problem} So I put the built-in recorded acoustic kit on for now.`
+      }
     }
     const result = runEdits(edits, base)
     const credit = edits.some((edit) => edit.type === 'set_sample' && edit.sample?.license === 'CC BY') ? ' CC BY sounds need a credit if you release the song; the credits are on the song card.' : ''
     const miss = misses.length ? ` Found nothing for "${[request.description, misses.join(', ')].filter(Boolean).join(' ')}", try other words.` : ''
-    const body = [edits.length ? `${result.text}${credit} Say "another ${sampleLabel(request.voices[0]).split(' ').pop()}" to hear the next one, or "back to synth drums".` : '', miss, problem ?? ''].filter(Boolean).join(' ').trim()
+    const freesound = edits.some((edit) => edit.type === 'set_sample')
+    const body = [problem ?? '', freesound ? `${result.text}${credit} Say "another ${sampleLabel(request.voices[0]).split(' ').pop()}" to hear the next one, or "back to synth drums".` : '', miss].filter(Boolean).join(' ').trim()
     setMessages((current) => current.map((message) => (message.id === pendingId ? { id: pendingId, from: 'bot', text: body || 'No samples found.' } : message)))
     setFlash(edits.length ? 'ready' : 'confused')
     setBusy(false)
@@ -269,6 +275,16 @@ export function CreateScreen() {
             onRedo={() => setHistory(redo)}
             onVersion={(index) => setHistory((current) => goTo(current, index))}
             onToggleDrawer={() => setDrawerOpen((open) => !open)}
+            onNext={() => {
+              const result = runEdits([{ type: 'next_song' }], song)
+              if (result.song && result.song !== song) {
+                player.setLoopSection(undefined)
+                setSelected(undefined)
+                addBot(`⏭ ${result.text}`)
+                runPlay({ type: 'play' }, result.song)
+              } else if (result.text) addBot(result.text)
+            }}
+            loadingSounds={player.loadingSounds}
             onRemoveSample={(voice) => handEdit({ type: 'set_sample', voice }, `synth ${sampleLabel(voice)} back`)}
             bouncing={player.bouncing}
             onSingOver={() => { if (player.bouncing) player.stop(); else { addBot(`🎤 Recording "${song.title}" into the Studio. It plays through once, then the Studio opens with a vocal preset that fits.`); void singOver(song) } }}

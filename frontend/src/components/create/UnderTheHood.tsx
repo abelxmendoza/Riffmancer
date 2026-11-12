@@ -8,6 +8,7 @@ import { sectionName, SONG_PARTS, type Energy, type SongSpec } from '../../song/
 import { DrumGrid } from '../beatmaker/DrumGrid'
 import { Slider, Toggle } from '../beatmaker/Slider'
 import { SynthPanel } from '../beatmaker/SynthPanel'
+import { InstrumentPicker } from './InstrumentPicker'
 
 type Tab = 'part' | 'sounds' | 'mix'
 
@@ -82,7 +83,10 @@ export function UnderTheHood({ song, section: index, playStep, onSection, onEdit
       )}
 
       {tab === 'sounds' && (
+        <>
+        <InstrumentPicker song={song} onEdit={onEdit} />
         <SynthPanel part={synthPart} patches={song.sounds} onPart={setSynthPart} onChange={(part, patch: SynthPatch) => onSong({ ...song, sounds: { ...song.sounds, [part]: patch } }, `tweaked the ${part} sound`)} />
+        </>
       )}
 
       {tab === 'mix' && (

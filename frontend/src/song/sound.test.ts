@@ -35,10 +35,15 @@ describe('sound descriptions', () => {
     const piano = designPatch('piano', base, 'chords')!
     expect(piano.patch.name).toBe('Piano')
     expect(piano.patch.wave).toBe('triangle')
-    // The post punk chords are a guitar: "fuzzier guitars" keeps it and adds drive.
+    // The post punk chords are a synth guitar: "fuzzier guitars" swaps in a recorded dirty guitar.
     const fuzz = designPatch('fuzzier guitars', base, 'chords')!
-    expect(fuzz.patch.wave).toBe(base.wave)
+    expect(fuzz.patch.sample).toMatch(/(overdriven|distortion)_guitar/)
     expect(fuzz.patch.drive).toBeGreaterThan(base.drive)
+    // On a recorded guitar it keeps that guitar and adds drive.
+    const clean = designPatch('clean guitar', base, 'chords')!.patch
+    const fuzzier = designPatch('fuzzier guitars', clean, 'chords')!.patch
+    expect(fuzzier.sample).toBe('electric_guitar_clean')
+    expect(fuzzier.drive).toBeGreaterThan(clean.drive)
     const dark = designPatch('darker and wider', base, 'chords')!
     expect(dark.patch.cutoff).toBeLessThan(base.cutoff)
     expect(dark.patch.chorus).toBeGreaterThan(base.chorus)

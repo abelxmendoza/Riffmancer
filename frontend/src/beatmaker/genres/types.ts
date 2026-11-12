@@ -51,6 +51,8 @@ export interface SynthPatch {
   glide: number
   /** Output level in decibels. */
   volume: number
+  /** A recorded instrument (song/instruments.ts id) that plays instead of the oscillators. */
+  sample?: string
 }
 
 export interface KitPatch {
@@ -64,6 +66,8 @@ export interface KitPatch {
   drive: number
   room: number
   volume: number
+  /** A bundled recorded kit (song/instruments.ts DRUM_SETS) for the voices it has. */
+  set?: string
 }
 
 export interface GenreDefinition {

@@ -1,6 +1,7 @@
 import { DRUM_VOICES, getGenre, type DrumVoice } from '../../beatmaker/genres'
 import { commercialOk, creditLine, sampleLabel, validSample, type SampleRef } from '../../song/samples'
 import { NOTE_NAMES, SCALE_LABELS } from '../../beatmaker/theory'
+import { DRUM_SETS } from '../../song/instruments'
 import type { SongHistory } from '../../song/history'
 import { formatDuration, sectionName, type SectionKind, type SongSpec } from '../../song/spec'
 import { PauseIcon, PlayIcon } from '../Icons'
@@ -45,10 +46,21 @@ interface SongCardProps {
   onRedo: () => void
   onVersion: (index: number) => void
   onToggleDrawer: () => void
+  /** A totally different song in the same genre or style. */
+  onNext: () => void
+  /** Recorded instruments are still downloading. */
+  loadingSounds?: boolean
   /** Takes a real drum sample off, back to the synth drum. */
   onRemoveSample?: (voice: DrumVoice) => void
   bouncing: boolean
   onSingOver: () => void
+}
+
+/** "Picked bass · Distorted guitar · Guitar solo · Acoustic kit": who's playing, recorded or synth. */
+function bandLine(song: SongSpec): string {
+  const parts = (['bass', 'chords', 'lead'] as const).map((part) => song.sounds[part].name.replace(/ \(edited\)$/, ''))
+  const kit = DRUM_SETS.find((set) => set.id === song.kit.set)?.name ?? 'Synth drums'
+  return [...parts, kit].join(' · ')
 }
 
 /** The one thing on screen besides Fret: the song, its parts, and its versions. */
@@ -57,6 +69,7 @@ export function SongCard(props: SongCardProps) {
   const genre = getGenre(song.genreId)
   const key = `${NOTE_NAMES[song.root]} ${SCALE_LABELS[song.scale].split(' ')[0].toLowerCase()}`
   const samples = DRUM_VOICES.flatMap((voice) => { const sample = validSample(song.samples?.[voice]); return sample ? [[voice, sample] as [DrumVoice, SampleRef]] : [] })
+  const band = bandLine(song)
   const selectedIndex = selected !== undefined && selected < song.sections.length ? selected : undefined
   return (
     <section aria-label="Your song" className="rounded-3xl border border-foreground/10 bg-surface p-4 sm:p-5">
@@ -72,7 +85,17 @@ export function SongCard(props: SongCardProps) {
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-display text-2xl font-black text-foreground sm:text-3xl">{song.title}</h1>
           <p className="mt-0.5 truncate text-xs font-bold text-foreground/50">{song.style ?? genre.name} · {song.bpm} BPM · {key} · {formatDuration(song)}</p>
+          <p className="mt-1 truncate text-[11px] text-foreground/45" title={band}>{props.loadingSounds ? 'Loading the instruments…' : band}</p>
         </div>
+        <button
+          type="button"
+          onClick={props.onNext}
+          title={`Don't like it? Get a totally different ${song.style ?? genre.name} song`}
+          className="flex shrink-0 flex-col items-center rounded-2xl border border-primary/50 px-3 py-2 text-primary hover:bg-primary hover:text-background"
+        >
+          <span className="text-lg font-black leading-none" aria-hidden="true">⏭</span>
+          <span className="mt-0.5 text-[11px] font-black uppercase tracking-wider">Next</span>
+        </button>
       </div>
 
       <div className="mt-4 flex gap-1" role="group" aria-label="Song parts">

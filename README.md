@@ -27,6 +27,8 @@ Fret is Riffmancer's mascot: a skull-bot roadie with a guitar-headstock crest wh
 
 Fret's built-in brain runs entirely in the browser and needs no account or key. To let Fret answer open-ended questions too, set `ANTHROPIC_API_KEY` on the server (for example in the Vercel project's environment variables). The `frontend/api/chat.ts` function then answers questions the built-in brain doesn't know, using Claude. Without the key, nothing leaves the browser.
 
+Real instruments ship with the app: 30 recorded instruments (bass guitars, guitars, piano, organs, strings, brass, sax, flute, choir, mallets) from the FluidR3 General MIDI soundfont via [gleitz/midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts) (MIT) in `frontend/public/instruments`, and two recorded drum kits in `frontend/public/drums` (an acoustic kit from VCSL, CC0, and a TR-808). Every other General MIDI instrument (banjo, harp, tuba…) loads from the soundfont site when asked for. Credits are in each folder's `CREDITS.txt`. The **Next** button on the song card writes a totally different song in the same genre: new parts, a new band from the genre's palette, another tempo, key and song shape.
+
 Real recorded drum hits come from [Freesound](https://freesound.org). Make a free API key at https://freesound.org/apiv2/apply and set it as `FREESOUND_API_KEY` in the same place. The key stays on the server: `frontend/api/sounds.ts` does the searching and the browser only gets sound previews, each with its licence and credit. Without the key, Fret says sample search is off and the synth drums keep playing.
 
 The site opens on a landing page (`#/`), with the Beat Maker at `#/beats`, the Studio at `#/studio` and the Stem Lab at `#/stems`.
