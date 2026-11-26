@@ -1,9 +1,11 @@
 # Riffmancer
 
-Riffmancer is a local-first music workstation with two workspaces:
+Riffmancer is a local-first music workstation:
 
 - **Beat Maker** lets you make beats and instrumentals with a MIDI keyboard, even if you don't know music theory. Pick a genre and press play, and a backing band starts. Then play chords and melodies on top. Every key you press fits the song.
+- **Create** is where Fret, the in-app assistant, acts as producer: describe what you want and Fret generates a whole song.
 - **Studio** records your vocals over an instrumental (an AI-generated song, Stem Lab stems, or a Beat Maker take), with genre vocal presets, stacked takes, a master bus and WAV export.
+- **Player** plays your songs back with audio-reactive visualizers.
 - **Stem Lab** turns AI-generated songs into stems that real musicians can rehearse with.
 
 ## Beat Maker
@@ -25,9 +27,13 @@ MIDI uses the browser's Web MIDI API (Chrome, Edge, Opera, and Firefox after a p
 
 Fret is Riffmancer's mascot: a skull-bot roadie with a guitar-headstock crest who lives in the chat bar at the bottom of every page. Type what you want in plain words, such as "make a metal beat at 165 bpm", "faster", "add a fill", "key of D minor", "make the synth darker", or "how do I play chords?", and Fret runs the band for you.
 
-Fret's built-in brain runs entirely in the browser and needs no account or key. To let Fret answer open-ended questions too, set `ANTHROPIC_API_KEY` on the server (for example in the Vercel project's environment variables). The `frontend/api/chat.ts` function then answers questions the built-in brain doesn't know, using Claude. Without the key, nothing leaves the browser.
+Fret's built-in brain runs entirely in the browser and needs no account or key. On the **Create** screen, Fret is also the producer: give it a prompt and it generates a whole song, which you can then take into the Studio or the Player. To let Fret answer open-ended questions too, set `ANTHROPIC_API_KEY` on the server (for example in the Vercel project's environment variables). The `frontend/api/chat.ts` function then answers questions the built-in brain doesn't know, using Claude. Without the key, nothing leaves the browser.
 
 The site opens on a landing page (`#/`), with the Beat Maker at `#/beats`, the Studio at `#/studio` and the Stem Lab at `#/stems`.
+
+## Create and Player
+
+The **Create** screen (added Nov 12, 2026) makes Fret the producer: describe the song you want in plain words and Fret generates the whole song. The **Player** (also Nov 12) plays your songs — from Create, the Studio, or Beat Maker takes — with audio-reactive visualizers.
 
 ## Studio
 
